@@ -1,13 +1,12 @@
 import os
-import time
-import cv2
 import torch
-import tqdm
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 import sys; sys.path.append("projects/PointRend")
 import point_rend
-from visualize import process_frame
+from visualize import process, custom_show1, custom_show
+from moviepy.editor import VideoFileClip, CompositeVideoClip
+import time
 
 cfg = get_cfg()
 # Add PointRend-specific config
@@ -26,23 +25,39 @@ input_path = os.path.join('input/', video_name)
 basename = os.path.splitext(video_name)[0]
 suffix = os.path.splitext(video_name)[1]
 
-video = cv2.VideoCapture(input_path)
-width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-frames_per_second = video.get(cv2.CAP_PROP_FPS)
-num_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-output_video_name = basename + f'{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}' + suffix
-output_video = os.path.join('output/', output_video_name)
-print(output_video)
-output_file = cv2.VideoWriter(filename=output_video, fourcc=cv2.VideoWriter_fourcc(*'DIVX'),
-                              fps=float(frames_per_second), frameSize=(width, height), isColor=True,)
-
-data = {'classes': None, 'boxes': None, 'masks': None, 'scores': None}
+def custom_frame1(frame):
+    _frame = frame.copy()
+    output = predictor(_frame)
+    instances = output['instances'].to('cpu')
+    data = {'classes': instances.pred_classes.numpy(), 'boxes': instances.pred_boxes.tensor.numpy(), 'masks':instances.pred_masks.numpy() , 'scores': instances.scores.numpy()}
+    data = process(data, target_class=[0])
+    result = custom_show1(_frame,  data['masks'])
+    return result
 
 
-for vis_frame in tqdm.tqdm(process_frame(video, data, predictor), total=num_frames):
-    output_file.write(vis_frame)
-video.release()
-output_file.release()
+def custom_frame(frame):
+    _frame = frame.copy()
+    output = predictor(_frame)
+    instances = output['instances'].to('cpu')
+    data = {'classes': instances.pred_classes.numpy(), 'boxes': instances.pred_boxes.tensor.numpy(), 'masks':instances.pred_masks.numpy() , 'scores': instances.scores.numpy()}
+    data = process(data, target_class=[0])
+    result = custom_show(_frame,  data['masks'])
+    return result
+
+
+video = VideoFileClip(input_path)
+mask_clip = video.fl_image(custom_frame1).to_mask().without_audio()
+clip = video.subclip(1, 3).set_mask(mask_clip).set_pos("center", "center")
+background_clip = VideoFileClip('input/DMT TUNNEL.mp4').without_audio().set_duration(clip.duration)
+final_clip = CompositeVideoClip([background_clip, clip])
+final_clip.write_videofile(
+	f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4',
+	fps=30,
+	codec='mpeg4',
+	bitrate="8000k",
+	audio_codec="libmp3lame",
+	threads=4,
+)
+
 

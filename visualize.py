@@ -89,22 +89,22 @@ def custom_show(image, masks):
         )
     return image
 
+def custom_show1(image, masks):
+    alpha = 1
+    if not len(masks):
+        for i in range(3):
+            image[:, :, i] = image[:, :, i] * (1 - alpha) + alpha * 0
+        return image
+    final_mask = masks[0]
+    for i in range(1, masks.shape[0]):
+        final_mask = np.bitwise_or(final_mask, masks[i])
+    for j in range(3):
+        image[:, :, j] = np.where(
+            final_mask == 1,
+            image[:, :, j] * (1 - alpha) + alpha * 255,
+            image[:, :, j] * (1 - alpha) + alpha * 0
+        )
+    return image
 
-# 每一帧的处理
-def process_frame(video, data, predictor):
-    while video.isOpened():
-        ret, frame = video.read()
-        if ret:
-            # add mask to frame
-            output = predictor(frame)
-            instances = output['instances'].to('cpu')
-            data['classes'] = instances.pred_classes.numpy()
-            data['boxes'] = instances.pred_boxes.tensor.numpy()
-            data['scores'] = instances.scores.numpy()
-            data['masks'] = instances.pred_masks.numpy()
-            data = process(data, target_class=[0])
-            n = len(data['classes'])
-            frame = custom_show(frame,  data['masks'])
-            yield frame
-        else:
-            break
+
+
