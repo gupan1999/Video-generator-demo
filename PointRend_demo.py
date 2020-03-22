@@ -20,7 +20,7 @@ if not torch.cuda.is_available():
 
 predictor = DefaultPredictor(cfg)
 
-video_name = '打野影流之主.mp4'
+video_name = 'cxk.mp4'
 input_path = os.path.join('input/', video_name)
 basename = os.path.splitext(video_name)[0]
 suffix = os.path.splitext(video_name)[1]
@@ -48,9 +48,10 @@ def custom_frame(frame):
 
 video = VideoFileClip(input_path)
 mask_clip = video.fl_image(custom_frame1).to_mask().without_audio()
-clip = video.subclip(1, 3).set_mask(mask_clip).set_pos("center", "center")
+clip = video.set_mask(mask_clip).set_pos("center", "center")
 background_clip = VideoFileClip('input/DMT TUNNEL.mp4').without_audio().set_duration(clip.duration)
 final_clip = CompositeVideoClip([background_clip, clip])
+
 final_clip.write_videofile(
 	f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4',
 	fps=30,
