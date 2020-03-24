@@ -7,4 +7,4 @@ def blur(image):
 
 clip = VideoFileClip("test2.mov")
 clip_blurred = clip.fl_image( blur )
-clip_blurred.write_videofile("blurred_video.mp4")
+clip_blurred.write_videofile("blurred_video.mov")
