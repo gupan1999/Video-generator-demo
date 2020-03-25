@@ -1,5 +1,10 @@
 # coco数据集的80个类别
-class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane',
+from enum import Enum, unique
+
+from PyQt5.QtCore import QObject, pyqtSignal
+from moviepy.video.io.VideoFileClip import VideoFileClip
+
+class_names = ('person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'bus', 'train', 'truck', 'boat', 'traffic light',
                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
                'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear',
@@ -13,7 +18,16 @@ class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
                'keyboard', 'cell phone', 'microwave', 'oven', 'toaster',
                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
-               'teddy bear', 'hair drier', 'toothbrush']
+               'teddy bear', 'hair drier', 'toothbrush')
+
+video_class = ('.mp4','.wmv','.rmvb','.avi')
+audio_class = ('.mp3','.wav')
+
+
+
+
+
+
 
 
 

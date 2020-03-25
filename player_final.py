@@ -523,6 +523,7 @@ class Player(QWidget):
         self.slider.setMaximum(duration)
 
     def positionChanged(self, progress):
+        print(progress)
         progress /= 1000
 
         if not self.slider.isSliderDown():
