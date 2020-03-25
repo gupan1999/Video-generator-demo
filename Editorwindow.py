@@ -9,12 +9,16 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QPushButton, QStyle, QSli
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from proglog import ProgressBarLogger
 from window import Ui_MainWindow
+from window1 import Ui_MainWindow1
 
 
-class Window(QMainWindow, Ui_MainWindow):
+class Window(QMainWindow, Ui_MainWindow1):
     final_clip = None
     video_backend = None
     cutter_end = 0
+    cutter_start = 0
+    withaudio = True
+
     def __init__(self):
         super(Window, self).__init__()
 
@@ -23,11 +27,14 @@ class Window(QMainWindow, Ui_MainWindow):
         self.pushButton.clicked.connect(self.openFile)
 
         self.pushButton_3.clicked.connect(self.process)
-
+        self.pushButton_3.setEnabled(False)
         self.pushButton_2.setEnabled(False)
+        self.pushButton_4.setEnabled(False)
+        self.pushButton_5.setEnabled(False)
         self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
         self.pushButton_2.clicked.connect(self.play)
-
+        self.pushButton_4.clicked.connect(self.setStart)
+        self.pushButton_5.clicked.connect(self.changeChannel)
         self.horizontalSlider.setRange(0,0)
         self.horizontalSlider.setStatusTip("slider")
         self.horizontalSlider.sliderMoved.connect(self.setPosition)
@@ -49,10 +56,17 @@ class Window(QMainWindow, Ui_MainWindow):
         self.mediaPlayer.durationChanged.connect(self.durationChanged)
         self.mediaPlayer.error.connect(self.handleError)
 
+    def changeChannel(self):
+        Window.withaudio = not Window.withaudio
 
+        self.pushButton_5.setText("有声") if Window.withaudio else self.pushButton_5.setText("无声")
+
+    def setStart(self):
+        Window.cutter_start = self.mediaPlayer.position()/1000
 
 
     def process(self):
+
         Window.cutter_end = self.mediaPlayer.position()/1000
         self.progressBar.setVisible(True)
         self.threadObject = ProcessObject()
@@ -86,10 +100,14 @@ class Window(QMainWindow, Ui_MainWindow):
                 QDir.homePath(),"Video(*.mp4;*.wmv;*.rmvb;*.avi);;Audio(*.mp3;*.wav)")
 
         if fileName != '':
+
             self.mediaPlayer.setMedia(
                     QMediaContent(QUrl.fromLocalFile(fileName)))
             self.pushButton_2.setEnabled(True)
             Window.video_backend = VideoFileClip(fileName)
+            self.pushButton_3.setEnabled(True)
+            self.pushButton_5.setEnabled(True)
+            self.pushButton_4.setEnabled(True)
 
 
 
@@ -136,7 +154,8 @@ class ProcessObject(QObject):  # 用于子线程的类
 
         my_logger = MyBarLogger(self.message, self.progress)
 
-        Window.final_clip = Window.video_backend.subclip(t_end=Window.cutter_end)
+        Window.final_clip = Window.video_backend.subclip(Window.cutter_start,Window.cutter_end) \
+            if Window.withaudio else Window.video_backend.subclip(Window.cutter_start,Window.cutter_end).without_audio()
 
         Window.final_clip.write_videofile(
             f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4',
