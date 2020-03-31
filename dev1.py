@@ -213,6 +213,7 @@ class MyWindow(QOpenGLWindow):
             painter = QPainter()
             painter.begin(self)
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
             painter.drawImage(self.geometry(), q.get())
             painter.end()
         #print(time.time()-temp)

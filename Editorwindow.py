@@ -29,12 +29,10 @@ class Window(QMainWindow, Ui_MainWindow1):
         self.pushButton_3.clicked.connect(self.process)
         self.pushButton_3.setEnabled(False)
         self.pushButton_2.setEnabled(False)
-        self.pushButton_4.setEnabled(False)
-        self.pushButton_5.setEnabled(False)
+
         self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
         self.pushButton_2.clicked.connect(self.play)
-        self.pushButton_4.clicked.connect(self.setStart)
-        self.pushButton_5.clicked.connect(self.changeChannel)
+
         self.horizontalSlider.setRange(0,0)
         self.horizontalSlider.setStatusTip("slider")
         self.horizontalSlider.sliderMoved.connect(self.setPosition)
@@ -49,7 +47,7 @@ class Window(QMainWindow, Ui_MainWindow1):
                                       QSizePolicy.Fixed)
         self.statusbar.addPermanentWidget(self.label)
         self.statusbar.addPermanentWidget(self.progressBar)
-        self.horizontalSlider.setTickPosition(QSlider.TicksBothSides )
+
         self.mediaPlayer.setVideoOutput(self.widget)
         self.mediaPlayer.stateChanged.connect(self.mediaStateChanged)
         self.mediaPlayer.positionChanged.connect(self.positionChanged)

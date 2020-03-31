@@ -1,4 +1,5 @@
 import sys
+import threading
 import time
 from enum import Enum
 
@@ -306,6 +307,7 @@ class ProcessObject(QObject):  # 用于子线程的类
         super(ProcessObject, self).__init__(parent)  # 显式调用父类构造函数
 
     def process_cut(self):
+        print(threading.current_thread())
         my_logger = MyBarLogger(self.message, self.progress)
         if isinstance(Window.current_clip,VideoFileClip):
             Window.current_clip = Window.current_clip.subclip(Window.cutter_start, Window.cutter_end) \
