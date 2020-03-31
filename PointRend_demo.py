@@ -4,15 +4,14 @@ import torch
 from Editorwindow2 import custom_frame1
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
-import sys; sys.path.append("projects/PointRend")
-import point_rend
+from projects.PointRend.point_rend import add_pointrend_config
 from visualize import process, custom_show1, custom_show
 from moviepy.editor import VideoFileClip, CompositeVideoClip
 import time
 
 cfg = get_cfg()
 # Add PointRend-specific config
-point_rend.add_pointrend_config(cfg)
+add_pointrend_config(cfg)
 # Load a config from file
 cfg.merge_from_file("projects/PointRend/configs/InstanceSegmentation/pointrend_rcnn_R_50_FPN_3x_coco.yaml")
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
@@ -22,7 +21,7 @@ if not torch.cuda.is_available():
 
 predictor = DefaultPredictor(cfg)
 
-video_name = 'cxk.mp4'
+video_name = '蔡徐坤.mp4'
 input_path = os.path.join('input/', video_name)
 basename = os.path.splitext(video_name)[0]
 suffix = os.path.splitext(video_name)[1]
@@ -46,7 +45,7 @@ mask_clip = video.fl_image(custom_frame1).to_mask().without_audio()
 clip = video.set_mask(mask_clip).set_pos("center", "center")
 background_clip = VideoFileClip('input/DMT TUNNEL.mp4').without_audio().set_duration(clip.duration)
 final_clip = CompositeVideoClip([background_clip, clip])
-video.add_mask()
+
 final_clip.write_videofile(
 	f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4',
 	fps=30,
