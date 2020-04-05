@@ -10,8 +10,10 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QStyle, QSizePolicy, QPro
     QStatusBar
 from audio import Audio
 from moviepy.audio.io.AudioFileClip import AudioFileClip
+from moviepy.video.VideoClip import VideoClip
 from moviepy.video.fx import speedx
 from moviepy.video.io.VideoFileClip import VideoFileClip
+from proglog import ProgressBarLogger
 
 from utils import State, tiktok_effect, MyListWidgetItem, listHeight
 
@@ -57,8 +59,8 @@ class Window(QMainWindow):
         self.horizontalLayout.addWidget(self.pushButton_2)
         self.pushButton_4 = QtWidgets.QPushButton(self.centralwidget)
         self.horizontalLayout.addWidget(self.pushButton_4)
-        self.pushButton_9 = QtWidgets.QPushButton(self.centralwidget)
-        self.horizontalLayout.addWidget(self.pushButton_9)
+
+
         self.pushButton_5 = QtWidgets.QPushButton(self.centralwidget)
         self.horizontalLayout.addWidget(self.pushButton_5)
         self.pushButton_8 = QtWidgets.QPushButton(self.centralwidget)
@@ -72,14 +74,14 @@ class Window(QMainWindow):
         self.pushButton_7.setText("打开目标")
         self.pushButton.setText("打开音频")
         self.pushButton_4.setText("设置切分起始时间")
-        self.pushButton_9.setText("tiktok")
+
         self.pushButton_5.setText("影流之主")
         self.pushButton_8.setText("原地切分")
         self.pushButton_10.setText("重复")
         self.pushButton_3.setText("生成")
         self.pushButton_3.setEnabled(False)
         self.pushButton_2.setEnabled(False)
-        self.pushButton_9.setEnabled(False)
+
         self.pushButton_4.setEnabled(False)
         self.pushButton_5.setEnabled(False)
         self.pushButton_10.setEnabled(False)
@@ -172,6 +174,8 @@ class Window(QMainWindow):
         self.video = None
         self.audio = None
         self.audioThread = None
+        self.processThread = None
+        self.processObject = None
         self.state = State.IDLE
 
     def setupSlot(self):
@@ -230,7 +234,7 @@ class Window(QMainWindow):
                 self.audio_backend = self.video_backend.audio
                 self.set_video.emit(self.video_backend)
                 self.set_audio.emit(self.audio_backend, self.audio_backend.fps, int(1.0 / self.video_backend.fps * self.audio_backend.fps), 2)
-                self.cur_listWidget.currentItem().setClip(self.video_backend ,self.audio_backend)
+                self.cur_listWidget.currentItem().setClip(self.video_backend, self.audio_backend)
                 self.durationChanged(self.video_backend.duration)
             elif self.video_backend and not self.audio_backend:
                 self.video_backend = self.video_backend.subclip(self.cutter_start, self.video.t)
@@ -246,12 +250,17 @@ class Window(QMainWindow):
 
         self.cutter_start = 0
 
-
     def getClip(self):
         if self.video_backend:
             return self.video_backend
         else:
             return self.audio_backend
+
+    def thread_message(self, value):
+        self.statusbar.showMessage(value)
+
+    def thread_progress(self, value):
+        self.progressBar.setValue(value)
 
     def fitState(self):
         if self.state == State.PLAYING:
@@ -265,7 +274,7 @@ class Window(QMainWindow):
             self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
             self.pushButton_2.setEnabled(True)
             self.pushButton_3.setEnabled(True)
-            self.pushButton_9.setEnabled(True)
+
             self.pushButton_5.setEnabled(True)
             self.pushButton_8.setEnabled(True)
             self.pushButton_10.setEnabled(True)
@@ -274,47 +283,67 @@ class Window(QMainWindow):
     def createContextMenu(self, pos):
         self.cur_listWidget = self.listWidget
         curItem = self.listWidget.itemAt(pos)
-        if not curItem:
+        if not curItem or self.state == State.PLAYING:
             return
         popMenu = QMenu(self)
         deleteAction = QAction("删除",self)
         saveAction = QAction("保存本地", self)
+        titokAction = QAction("tiktok效果", self)
         popMenu.addAction(deleteAction)
         popMenu.addAction(saveAction)
+        popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
         saveAction.triggered.connect(self.saveItem)
+        titokAction.triggered.connect(self.video.tiktok)
         popMenu.exec(QCursor.pos())
 
     def createContextMenu2(self, pos):
         self.cur_listWidget = self.listWidget_2
         curItem = self.listWidget_2.itemAt(pos)
-        if not curItem:
+        if not curItem or self.state == State.PLAYING:
             return
         popMenu = QMenu(self)
-        deleteAction = QAction("删除",self)
+        deleteAction = QAction("删除", self)
+        saveAction = QAction("保存本地", self)
+        titokAction = QAction("tiktok效果",self)
         popMenu.addAction(deleteAction)
+        popMenu.addAction(saveAction)
+        popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
+        saveAction.triggered.connect(self.saveItem)
+        titokAction.triggered.connect(self.video.tiktok)
         popMenu.exec(QCursor.pos())
 
     def createContextMenu3(self, pos):
         self.cur_listWidget = self.listWidget_3
         curItem = self.listWidget_3.itemAt(pos)
-        if not curItem:
+        if not curItem or self.state == State.PLAYING:
             return
         popMenu = QMenu(self)
-        deleteAction = QAction("删除",self)
+        deleteAction = QAction("删除", self)
         popMenu.addAction(deleteAction)
         deleteAction.triggered.connect(self.deleteItem)
         popMenu.exec(QCursor.pos())
-
 
     def deleteItem(self):
         ditem = self.cur_listWidget.takeItem(self.cur_listWidget.row(self.cur_listWidget.currentItem()))
         del ditem
 
     def saveItem(self):
-        self.cur_listWidget.currentItem().video.write_videofile(f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4')
+        self.processObject = ProcessObject(self.cur_listWidget.currentItem().video)
+        self.processThread = QThread()
+        self.processObject.moveToThread(self.processThread)
+        self.processObject.finish_process.connect(self.finishProcess)
+        self.processObject.message.connect(self.thread_message)
+        self.processObject.progress.connect(self.thread_progress)
+        self.processThread.started.connect(self.processObject.process)
+        self.progressBar.setVisible(True)
+        self.processThread.start()
 
+    def finishProcess(self):
+        self.progressBar.setVisible(False)
+        self.processThread.quit()
+        self.processThread.wait()
 
     def processFinish(self):
         self.state = State.FINISHED
@@ -357,8 +386,6 @@ class Window(QMainWindow):
         self.setupMedia(item)
         self.fitState()
         self.cur_listWidget = item.listWidget()
-
-
 
     def openTarget(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Video", QDir.homePath(),
@@ -415,7 +442,6 @@ class Window(QMainWindow):
             self.video = Video(item.video)
             self.durationChanged(duration)
             self.calthread = QThread()
-            #self.pushButton_5.clicked.connect(self.video.speed)
             self.video.moveToThread(self.calthread)
             self.video.t_changed.connect(self.positionChanged)
             self.stop.connect(self.video.stop)
@@ -423,7 +449,6 @@ class Window(QMainWindow):
             self.resume.connect(self.video.resume)
             self.video.finish.connect(self.processFinish)
             self.calthread.started.connect(self.video.work)
-            self.pushButton_9.clicked.connect(self.video.tiktok)
             self.set_video.connect(self.video.setClip)
             self.audioThread = QThread()
             if self.audio_backend:
@@ -575,6 +600,41 @@ class Video(QObject):
     def setT(self, t):
         self.t = t
         self.t_changed.emit(self.t * 10)
+
+
+class MyBarLogger(ProgressBarLogger):
+
+    def __init__(self, message, progress):
+        self.message = message
+        self.progress = progress
+        super(MyBarLogger, self).__init__()
+
+    def callback(self, **changes):
+        bars = self.state.get('bars')
+        index = len(bars.values()) - 1
+        if index > -1:
+            bar = list(bars.values())[index]
+            progress = int(bar['index'] / bar['total'] * 100)
+            self.progress.emit(progress)
+        if 'message' in changes: self.message.emit(changes['message'])
+
+class ProcessObject(QObject):
+    finish_process = pyqtSignal()
+    progress = pyqtSignal(int)
+    message = pyqtSignal(str)
+
+    def __init__(self, clip, parent=None):
+        super(ProcessObject, self).__init__(parent)
+        self.clip = clip
+
+    def process(self):
+        if isinstance(self.clip,VideoClip):
+            myLogger = MyBarLogger(self.message,self.progress)
+            self.clip.write_videofile(f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4',codec='mpeg4',
+                audio_codec="libmp3lame",
+                bitrate="8000k",
+                threads=4,logger=myLogger)
+            self.finish_process.emit()
 
 
 q = queue.Queue()
