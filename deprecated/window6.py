@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'window3.ui'
+# Form implementation generated from reading ui file 'window6.ui'
 #
 # Created by: PyQt5 UI code generator 5.11.3
 #
@@ -8,12 +8,10 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(965, 592)
+        MainWindow.resize(905, 879)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
@@ -38,6 +36,7 @@ class Ui_MainWindow(object):
         self.pushButton_6 = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton_6.setObjectName("pushButton_6")
         self.horizontalLayout.addWidget(self.pushButton_6)
+
         self.pushButton = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton.setObjectName("pushButton")
         self.horizontalLayout.addWidget(self.pushButton)
@@ -57,16 +56,59 @@ class Ui_MainWindow(object):
         self.pushButton_8 = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton_8.setObjectName("pushButton_8")
         self.horizontalLayout.addWidget(self.pushButton_8)
+        self.pushButton_10 = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_10.setObjectName("pushButton_10")
+        self.horizontalLayout.addWidget(self.pushButton_10)
         self.pushButton_3 = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton_3.setObjectName("pushButton_3")
         self.horizontalLayout.addWidget(self.pushButton_3)
         self.gridLayout.addLayout(self.horizontalLayout, 1, 0, 1, 1)
-
+        self.listWidget_3 = QtWidgets.QListWidget(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.listWidget_3.sizePolicy().hasHeightForWidth())
+        self.listWidget_3.setSizePolicy(sizePolicy)
+        self.listWidget_3.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.listWidget_3.setDragEnabled(True)
+        self.listWidget_3.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
+        self.listWidget_3.setDefaultDropAction(QtCore.Qt.MoveAction)
+        self.listWidget_3.setFlow(QtWidgets.QListView.LeftToRight)
+        self.listWidget_3.setObjectName("listWidget_3")
+        self.gridLayout.addWidget(self.listWidget_3, 5, 0, 1, 1)
+        self.listWidget = QtWidgets.QListWidget(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.listWidget.sizePolicy().hasHeightForWidth())
+        self.listWidget.setSizePolicy(sizePolicy)
+        self.listWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.listWidget.setDragEnabled(True)
+        self.listWidget.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
+        self.listWidget.setDefaultDropAction(QtCore.Qt.MoveAction)
+        self.listWidget.setFlow(QtWidgets.QListView.LeftToRight)
+        self.listWidget.setLayoutMode(QtWidgets.QListView.SinglePass)
+        self.listWidget.setObjectName("listWidget")
+        self.gridLayout.addWidget(self.listWidget, 3, 0, 1, 1)
+        self.listWidget_2 = QtWidgets.QListWidget(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.listWidget_2.sizePolicy().hasHeightForWidth())
+        self.listWidget_2.setSizePolicy(sizePolicy)
+        self.listWidget_2.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.listWidget_2.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.listWidget_2.setDragEnabled(True)
+        self.listWidget_2.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
+        self.listWidget_2.setDefaultDropAction(QtCore.Qt.MoveAction)
+        self.listWidget_2.setFlow(QtWidgets.QListView.LeftToRight)
+        self.listWidget_2.setObjectName("listWidget_2")
+        self.gridLayout.addWidget(self.listWidget_2, 4, 0, 1, 1)
 
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 965, 26))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 905, 26))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -79,12 +121,13 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "VideoEditor"))
-        self.pushButton_7.setText(_translate("MainWindow", "打开背景"))
-        self.pushButton_6.setText(_translate("MainWindow", "打开bgm"))
-        self.pushButton.setText(_translate("MainWindow", "打开目标"))
-        self.pushButton_4.setText(_translate("MainWindow", "起始"))
+        self.pushButton_6.setText(_translate("MainWindow", "打开背景"))
+        self.pushButton_7.setText(_translate("MainWindow", "打开目标"))
+        self.pushButton.setText(_translate("MainWindow", "打开音频"))
+        self.pushButton_4.setText(_translate("MainWindow", "设置切分起始时间"))
         self.pushButton_9.setText(_translate("MainWindow", "tiktok"))
-        self.pushButton_5.setText(_translate("MainWindow", "有声"))
-        self.pushButton_8.setText(_translate("MainWindow", "切分"))
+        self.pushButton_5.setText(_translate("MainWindow", "影流之主"))
+        self.pushButton_8.setText(_translate("MainWindow", "原地切分"))
+        self.pushButton_10.setText(_translate("MainWindow", "重复"))
         self.pushButton_3.setText(_translate("MainWindow", "生成"))
 

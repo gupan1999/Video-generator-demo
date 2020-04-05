@@ -1,6 +1,12 @@
-# coco数据集的80个类别
+#!/usr/bin/env python
+# coding: utf-8
+
 from enum import Enum, unique
 
+from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import QListWidgetItem
+
+# coco数据集的80个类别
 class_names = ('person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'bus', 'train', 'truck', 'boat', 'traffic light',
                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
@@ -46,6 +52,28 @@ class State(Enum):
     PLAYING = 2
     PAUSE = 3
     FINISHED = 4
+
+
+listHeight = 60
+
+
+class MyListWidgetItem(QListWidgetItem):
+    def __init__(self, clipName=None, video=None, audio=None, parent=None):
+        super(MyListWidgetItem, self).__init__(clipName, parent)
+        self.video = video
+        self.audio = audio
+        self.text = clipName
+        self.duration = self.video.duration if self.video else self.audio.duration
+        self.setSizeHint(QSize(self.duration*10, listHeight))
+
+    def setClip(self, video=None, audio=None):
+        self.video = video
+        self.audio = audio
+        self.duration = self.video.duration if self.video else self.audio.duration
+        self.setSizeHint(QSize(self.duration * 10, listHeight))
+
+    def copy(self):
+        return MyListWidgetItem(self.text, self.video, self.audio)
 
 
 

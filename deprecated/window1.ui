@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>965</width>
-    <height>592</height>
+    <width>800</width>
+    <height>560</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -21,30 +21,16 @@
        <enum>QLayout::SetFixedSize</enum>
       </property>
       <item>
-       <widget class="QPushButton" name="pushButton_7">
-        <property name="text">
-         <string>打开背景</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_6">
-        <property name="text">
-         <string>打开bgm</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QPushButton" name="pushButton">
         <property name="text">
-         <string>打开目标</string>
+         <string>打开</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_2">
         <property name="text">
-         <string/>
+         <string>PushButton</string>
         </property>
        </widget>
       </item>
@@ -56,48 +42,16 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pushButton_9">
-        <property name="text">
-         <string>tiktok</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QPushButton" name="pushButton_5">
         <property name="text">
-         <string>有声</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_8">
-        <property name="text">
-         <string>切分</string>
+         <string>无声</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_3">
         <property name="text">
-         <string>生成</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </item>
-    <item row="2" column="0">
-     <layout class="QHBoxLayout" name="horizontalLayout_3">
-      <item>
-       <widget class="QSlider" name="horizontalSlider">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string/>
+         <string>处理</string>
         </property>
        </widget>
       </item>
@@ -113,6 +67,13 @@
       </property>
      </widget>
     </item>
+    <item row="2" column="0">
+     <widget class="QSlider" name="horizontalSlider">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -120,7 +81,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>965</width>
+     <width>800</width>
      <height>26</height>
     </rect>
    </property>

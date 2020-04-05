@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'window2.ui'
+# Form implementation generated from reading ui file 'window3.ui'
 #
 # Created by: PyQt5 UI code generator 5.11.3
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtMultimediaWidgets import QVideoWidget
+
 
 
 class Ui_MainWindow(object):
@@ -18,6 +18,17 @@ class Ui_MainWindow(object):
         self.centralwidget.setObjectName("centralwidget")
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName("gridLayout")
+        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
+        self.horizontalSlider = QtWidgets.QSlider(self.centralwidget)
+        self.horizontalSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.horizontalSlider.setObjectName("horizontalSlider")
+        self.horizontalLayout_3.addWidget(self.horizontalSlider)
+        self.label = QtWidgets.QLabel(self.centralwidget)
+        self.label.setText("")
+        self.label.setObjectName("label")
+        self.horizontalLayout_3.addWidget(self.label)
+        self.gridLayout.addLayout(self.horizontalLayout_3, 2, 0, 1, 1)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setSizeConstraint(QtWidgets.QLayout.SetFixedSize)
         self.horizontalLayout.setObjectName("horizontalLayout")
@@ -50,25 +61,9 @@ class Ui_MainWindow(object):
         self.pushButton_3.setObjectName("pushButton_3")
         self.horizontalLayout.addWidget(self.pushButton_3)
         self.gridLayout.addLayout(self.horizontalLayout, 1, 0, 1, 1)
-        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        self.horizontalSlider = QtWidgets.QSlider(self.centralwidget)
-        self.horizontalSlider.setOrientation(QtCore.Qt.Horizontal)
-        self.horizontalSlider.setObjectName("horizontalSlider")
-        self.horizontalLayout_3.addWidget(self.horizontalSlider)
-        self.label = QtWidgets.QLabel(self.centralwidget)
-        self.label.setText("")
-        self.label.setObjectName("label")
-        self.horizontalLayout_3.addWidget(self.label)
-        self.gridLayout.addLayout(self.horizontalLayout_3, 2, 0, 1, 1)
-        self.widget = QVideoWidget(self.centralwidget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.widget.sizePolicy().hasHeightForWidth())
-        self.widget.setSizePolicy(sizePolicy)
-        self.widget.setObjectName("widget")
-        self.gridLayout.addWidget(self.widget, 0, 0, 1, 1)
+
+
+
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 965, 26))
@@ -89,8 +84,7 @@ class Ui_MainWindow(object):
         self.pushButton.setText(_translate("MainWindow", "打开目标"))
         self.pushButton_4.setText(_translate("MainWindow", "起始"))
         self.pushButton_9.setText(_translate("MainWindow", "tiktok"))
-        self.pushButton_5.setText(_translate("MainWindow", "有声"))
+        self.pushButton_5.setText(_translate("MainWindow", "选定区域"))
         self.pushButton_8.setText(_translate("MainWindow", "切分"))
         self.pushButton_3.setText(_translate("MainWindow", "生成"))
-
 

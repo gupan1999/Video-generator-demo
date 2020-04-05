@@ -3,12 +3,13 @@ import threading
 import time
 from enum import Enum
 
+
 import qdarkstyle
 import torch
-from PyQt5.QtCore import QDir, QUrl, QObject, pyqtSignal, QThread, QTime
+from PyQt5.QtCore import QDir, QUrl, QObject, pyqtSignal, QThread, QTime, Qt
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtWidgets import QMainWindow, QApplication, QStyle, QSlider, QLabel, QSizePolicy, QProgressBar, \
-    QFileDialog, QMessageBox
+    QFileDialog, QMessageBox, QListView, QListWidget, QScroller
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
 from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -18,7 +19,7 @@ from projects.PointRend.point_rend.config import add_pointrend_config
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultPredictor
 from visualize import custom_show1, process
-from window2 import Ui_MainWindow
+from window5 import Ui_MainWindow
 
 
 cfg = get_cfg()
@@ -53,6 +54,12 @@ class Window(QMainWindow, Ui_MainWindow):
         self.mediaPlayer = QMediaPlayer()
         self.mediaPlayer.setVideoOutput(self.widget)
 
+        self.listWidget.setViewMode(QListView.ListMode)
+        self.listWidget.setFlow(QListView.LeftToRight)
+        self.listWidget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.listWidget.setHorizontalScrollMode(QListWidget.ScrollPerPixel)
+        self.listWidget.setFixedHeight(50)
+
         self.pushButton_3.setEnabled(False)
         self.pushButton_2.setEnabled(False)
         self.pushButton_4.setEnabled(False)
@@ -83,11 +90,15 @@ class Window(QMainWindow, Ui_MainWindow):
         self.pushButton_3.clicked.connect(self.process)
         self.pushButton_8.clicked.connect(self.cut)
         self.pushButton_9.clicked.connect(self.tiktok)
-        # self.pushButton_10.clicked.connect(self.triple)
+        self.pushButton_10.clicked.connect(self.add)
         self.mediaPlayer.stateChanged.connect(self.mediaStateChanged)
         self.mediaPlayer.positionChanged.connect(self.positionChanged)
         self.mediaPlayer.durationChanged.connect(self.durationChanged)
         self.mediaPlayer.error.connect(self.handleError)
+
+    def add(self):
+
+        self.listWidget.addItem("item")
 
     def cut(self):
         end = self.mediaPlayer.position() / 1000
@@ -103,7 +114,6 @@ class Window(QMainWindow, Ui_MainWindow):
             self.threadObject.finish_cut.connect(self.finishCut)
             self.threadObject.message.connect(self.thread_message)
             self.threadObject.progress.connect(self.thread_progress)
-
             self.subThread.start()
             self.blockCommand()
 

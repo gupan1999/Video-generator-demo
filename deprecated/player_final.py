@@ -367,11 +367,11 @@ class HistogramWidget(QWidget):
         for i, value in enumerate(self.m_histogram):
             h = value * self.height()
             # Draw the level.
-            painter.fillRect(barWidth * i, self.height() - h,
-                    barWidth * (i + 1), self.height(), Qt.red)
+            painter.fillRect(int(barWidth * i), int(self.height() - h),
+                    int(barWidth * (i + 1)), int(self.height()), Qt.red)
             # Clear the rest of the control.
-            painter.fillRect(barWidth * i, 0, barWidth * (i + 1),
-                    self.height() - h, Qt.black)
+            painter.fillRect(int(barWidth * i), 0, int(barWidth * (i + 1)),
+                    int(self.height() - h), Qt.black)
 
 
 class Player(QWidget):
@@ -478,7 +478,7 @@ class Player(QWidget):
         hLayout.addWidget(self.labelDuration)
         layout.addLayout(hLayout)
         layout.addLayout(controlLayout)
-        #layout.addLayout(histogramLayout)
+        layout.addLayout(histogramLayout)
 
         self.setLayout(layout)
 

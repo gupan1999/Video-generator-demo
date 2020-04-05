@@ -5,7 +5,7 @@ import time
 from PyQt5.QtCore import QDir, QUrl, QObject, pyqtSignal, QThread
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtWidgets import QMainWindow, QApplication, QPushButton, QStyle, QSlider, QLabel, QSizePolicy, QProgressBar, \
-    QHBoxLayout, QVBoxLayout, QFileDialog
+    QHBoxLayout, QVBoxLayout, QFileDialog, QRubberBand
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from proglog import ProgressBarLogger
 from window import Ui_MainWindow
@@ -53,6 +53,7 @@ class Window(QMainWindow, Ui_MainWindow1):
         self.mediaPlayer.positionChanged.connect(self.positionChanged)
         self.mediaPlayer.durationChanged.connect(self.durationChanged)
         self.mediaPlayer.error.connect(self.handleError)
+
 
     def changeChannel(self):
         Window.withaudio = not Window.withaudio
