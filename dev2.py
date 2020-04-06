@@ -4,19 +4,28 @@ import time
 import qdarkstyle
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import QDir, QObject, pyqtSignal, QThread, QTimer, Qt, QTime, QPoint, QRect, QSize, QEvent
-from PyQt5.QtGui import QSurfaceFormat, QPainter, QImage, QOpenGLWindow, QIcon, QCursor
+from PyQt5.QtGui import QSurfaceFormat, QPainter, QImage, QOpenGLWindow, QIcon, QCursor, QFont
 from PyQt5.QtWidgets import QMainWindow, QApplication, QStyle, QSizePolicy, QProgressBar, \
     QFileDialog, QRubberBand, QOpenGLWidget, QListWidgetItem, QListWidget, QMessageBox, QMenu, QAction, QWidget, \
-    QStatusBar
+    QStatusBar, QDialogButtonBox
 from audio import Audio
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.video.VideoClip import VideoClip
-from moviepy.video.fx import speedx
+from moviepy.audio.AudioClip import AudioClip
+import moviepy.video.fx.all as vfx
 from moviepy.video.io.VideoFileClip import VideoFileClip
-from proglog import ProgressBarLogger
 
-from utils import State, tiktok_effect, MyListWidgetItem, listHeight
+from utils import State, tiktok_effect, MyListWidgetItem, listHeight, CompositeObject
 
+# TODO: 一些问题
+# 1.删除正在播放的item后还能继续播放此clip。若这一行为空时currentitem为空，重复、原地切分都不行(已通过手动禁止解决)
+# 2.直接拖动进度条到最后可能会文件冲突,可能是计算video.t的问题
+# 3.暂停状态不必要地读取、重绘画面，使得处理此clip过程中可能冲突
+# 4.Moviepy目前在windows下操作若干次后产生句柄错误
+# 5.音频流播放的设置不太懂
+# 6.处理过程中未block涉及到的item，一旦操作它们就会产生冲突(通过设置item不可选似乎解决了，不过应该还要阻止导入正在处理的素材)
+# 7.写入文件不知道怎么在运行时停止
+# 8.默认是双通道立体声
 
 # noinspection PyAttributeOutsideInit
 class Window(QMainWindow):
@@ -31,20 +40,43 @@ class Window(QMainWindow):
         self.setWindowTitle("VideoEditor")
         self.centralwidget = QWidget(self)
 
+
+
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
-        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
 
         self.horizontalSlider = QtWidgets.QSlider(self.centralwidget)
         self.horizontalSlider.setOrientation(Qt.Horizontal)
         self.horizontalSlider.setRange(0, 0)
-        self.horizontalLayout_3.addWidget(self.horizontalSlider)
+        self.horizontalLayout_2.addWidget(self.horizontalSlider)
 
         self.label = QtWidgets.QLabel(self.centralwidget)
         self.label.setText("")
+        self.horizontalLayout_2.addWidget(self.label)
 
-        self.horizontalLayout_3.addWidget(self.label)
+        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.label_target = QtWidgets.QLabel(self.centralwidget)
+        self.label_target.setText("目标")
+        self.label_target.setSizePolicy(sizePolicy)
+        self.horizontalLayout_3.addWidget(self.label_target)
+        self.gridLayout.addLayout(self.horizontalLayout_3, 3, 0, 1, 1)
 
-        self.gridLayout.addLayout(self.horizontalLayout_3, 2, 0, 1, 1)
+        self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
+        self.label_background = QtWidgets.QLabel(self.centralwidget)
+        self.label_background.setSizePolicy(sizePolicy)
+        self.label_background.setText("背景")
+        self.horizontalLayout_4.addWidget(self.label_background)
+        self.gridLayout.addLayout(self.horizontalLayout_4, 4, 0, 1, 1)
+
+        self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
+        self.label_audio = QtWidgets.QLabel(self.centralwidget)
+        self.label_audio.setSizePolicy(sizePolicy)
+        self.label_audio.setText("音频")
+        self.horizontalLayout_5.addWidget(self.label_audio)
+        self.gridLayout.addLayout(self.horizontalLayout_5, 5, 0, 1, 1)
+
+        self.gridLayout.addLayout(self.horizontalLayout_2, 2, 0, 1, 1)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setSizeConstraint(QtWidgets.QLayout.SetFixedSize)
 
@@ -61,8 +93,6 @@ class Window(QMainWindow):
         self.horizontalLayout.addWidget(self.pushButton_4)
 
 
-        self.pushButton_5 = QtWidgets.QPushButton(self.centralwidget)
-        self.horizontalLayout.addWidget(self.pushButton_5)
         self.pushButton_8 = QtWidgets.QPushButton(self.centralwidget)
         self.horizontalLayout.addWidget(self.pushButton_8)
         self.pushButton_10 = QtWidgets.QPushButton(self.centralwidget)
@@ -75,7 +105,7 @@ class Window(QMainWindow):
         self.pushButton.setText("打开音频")
         self.pushButton_4.setText("设置切分起始时间")
 
-        self.pushButton_5.setText("影流之主")
+
         self.pushButton_8.setText("原地切分")
         self.pushButton_10.setText("重复")
         self.pushButton_3.setText("生成")
@@ -83,7 +113,7 @@ class Window(QMainWindow):
         self.pushButton_2.setEnabled(False)
 
         self.pushButton_4.setEnabled(False)
-        self.pushButton_5.setEnabled(False)
+
         self.pushButton_10.setEnabled(False)
         self.pushButton_8.setEnabled(False)
 
@@ -112,7 +142,7 @@ class Window(QMainWindow):
         self.listWidget_3.setContextMenuPolicy(Qt.CustomContextMenu)
         self.listWidget_3.setFixedHeight(listHeight)
         self.listWidget_3.setHorizontalScrollMode(QListWidget.ScrollPerPixel)
-        self.gridLayout.addWidget(self.listWidget_3, 5, 0, 1, 1)
+        self.horizontalLayout_5.addWidget(self.listWidget_3)
 
         self.listWidget = QtWidgets.QListWidget(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -129,7 +159,7 @@ class Window(QMainWindow):
         self.listWidget.setFixedHeight(listHeight)
         self.listWidget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.listWidget.setHorizontalScrollMode(QListWidget.ScrollPerPixel)
-        self.gridLayout.addWidget(self.listWidget, 3, 0, 1, 1)
+        self.horizontalLayout_3.addWidget(self.listWidget)
 
         self.listWidget_2 = QtWidgets.QListWidget(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -146,10 +176,9 @@ class Window(QMainWindow):
         self.listWidget_2.setFixedHeight(listHeight)
         self.listWidget_2.setContextMenuPolicy(Qt.CustomContextMenu)
         self.listWidget_2.setHorizontalScrollMode(QListWidget.ScrollPerPixel)
-        self.gridLayout.addWidget(self.listWidget_2, 4, 0, 1, 1)
+        self.horizontalLayout_4.addWidget(self.listWidget_2)
 
         self.setCentralWidget(self.centralwidget)
-
         self.menubar = QtWidgets.QMenuBar(self)
         self.menubar.setGeometry(QRect(0, 0, 905, 26))
         self.setMenuBar(self.menubar)
@@ -157,26 +186,39 @@ class Window(QMainWindow):
         self.progressBar = QProgressBar()
         self.progressBar.setVisible(False)
         self.progressBar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.progressBar.setFixedHeight(20)
+        # self.cancelBtn = QtWidgets.QPushButton()
+        # self.cancelBtn.setText("取消")
+        # self.cancelBtn.setVisible(False)
+        # self.cancelBtn.setEnabled(False)
         self.statusbar.addPermanentWidget(self.progressBar)
+        # self.statusbar.addPermanentWidget(self.cancelBtn)
+
+
         self.setStatusBar(self.statusbar)
 
     def setupData(self):
-        self.final_clip = None
+        self.final_clip = None   #未用上
         self.audio_backend = None
         self.video_backend = None
         self.audio = None
         self.cutter_end = 0
         self.cutter_start = 0
-        self.product = ''
         self.cur_listWidget = None
         self.flag = 0
         self.calthread = None
         self.video = None
         self.audio = None
         self.audioThread = None
-        self.processThread = None
+        self.saveThread = None
+        self.saveObject = None
         self.processObject = None
         self.state = State.IDLE
+        self.compositeObject = None
+        self.compositeThread = None
+        self.items, self.items_2, self.items_3 = [], [], []
+
+
 
     def setupSlot(self):
         self.pushButton.clicked.connect(self.openAudio)
@@ -184,7 +226,7 @@ class Window(QMainWindow):
         self.pushButton_6.clicked.connect(self.openBackground)
         self.pushButton_8.clicked.connect(self.cut)
         self.pushButton_10.clicked.connect(self.copySelected)
-        # self.pushButton_3.clicked.connect(self.process)
+        self.pushButton_3.clicked.connect(self.setupPara)
         self.pushButton_2.clicked.connect(self.play)
         self.pushButton_4.clicked.connect(self.setStart)
         self.horizontalSlider.sliderMoved.connect(self.setPosition)
@@ -196,6 +238,7 @@ class Window(QMainWindow):
         self.listWidget.customContextMenuRequested.connect(self.createContextMenu)
         self.listWidget_2.customContextMenuRequested.connect(self.createContextMenu2)
         self.listWidget_3.customContextMenuRequested.connect(self.createContextMenu3)
+        # self.cancelBtn.clicked.connect(self.terminate)
 
     def __init__(self):
         super(Window, self).__init__()
@@ -224,6 +267,39 @@ class Window(QMainWindow):
     def copySelected(self):
         self.cur_listWidget.addItem(self.cur_listWidget.currentItem().copy())
 
+    def setupPara(self):
+        if self.listWidget.count() and self.listWidget_2.count():
+            self.dialog = QtWidgets.QDialog(self)
+            self.dialog.setAttribute(Qt.WA_DeleteOnClose)
+            self.dialog.setWindowModality(Qt.WindowModal)
+            self.dialog.setWindowTitle("准备合成")
+            gridLayout = QtWidgets.QGridLayout(self.dialog)
+            self.dialog.setLayout(gridLayout)
+            self.check = QtWidgets.QCheckBox("分身效果", self.dialog)
+            self.gauss = QtWidgets.QCheckBox("全局高斯模糊", self.dialog)
+            sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            self.check.setSizePolicy(sizePolicy)
+            self.gauss.setSizePolicy(sizePolicy)
+            dialogbtns = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
+            dialogbtns.button(QDialogButtonBox.Cancel).setText("取消")
+            dialogbtns.button(QDialogButtonBox.Ok).setText("开始")
+            dialogbtns.rejected.connect(self.dialog.reject)
+            dialogbtns.accepted.connect(self.dialog.accept)
+            dialogbtns.accepted.connect(self.composite)
+            dialogbtns.setSizePolicy(sizePolicy)
+            label = QtWidgets.QLabel()
+            label.setText("默认分辨率 1280x720")
+            gridLayout.addWidget(self.check, 0, 0, 1, 1)
+            gridLayout.addWidget(dialogbtns, 3, 0, 1, 1)
+            gridLayout.addWidget(label, 2, 0, 1, 1)
+            gridLayout.addWidget(self.gauss, 1, 0, 1, 1)
+            self.dialog.resize(400, 300)
+            self.dialog.show()
+
+    # def terminate(self):
+    #     self.compositeThread.quit()
+    #     self.compositeThread.wait(500)
+
     def cut(self):
         if self.video.t <= self.cutter_start:
             QMessageBox.critical(self, "警告", "请在起始时间之后切分")
@@ -250,11 +326,43 @@ class Window(QMainWindow):
 
         self.cutter_start = 0
 
-    def getClip(self):
-        if self.video_backend:
-            return self.video_backend
-        else:
-            return self.audio_backend
+    def composite(self):
+        self.stop.emit()
+        self.audio_backend = None
+        self.video_backend = None
+        self.state = State.IDLE
+        self.fitState()
+        targets, backgrounds, audios = [], [], []
+
+        for i in range(self.listWidget.count()):
+            item = self.listWidget.item(i)
+            targets.append(item.video)
+            self.items.append(item)
+            item.setFlags(item.flags() & ( (Qt.ItemIsSelectable|Qt.ItemIsEnabled)^0xff))
+        for i in range(self.listWidget_2.count()):
+            item_2 = self.listWidget_2.item(i)
+            backgrounds.append(item_2.video)
+            self.items_2.append(item_2)
+            item_2.setFlags(item.flags() & ((Qt.ItemIsSelectable | Qt.ItemIsEnabled) ^ 0xff))
+        for i in range(self.listWidget_3.count()):
+            item_3 = self.listWidget_3.item(i)
+            audios.append(item_3.audio)
+            self.items_3.append(item_3)
+            item_3.setFlags(item.flags() & ((Qt.ItemIsSelectable | Qt.ItemIsEnabled) ^ 0xff))
+
+        self.compositeObject = CompositeObject(targets, backgrounds, audios, triple=self.check.isChecked(), gauss=self.gauss.isChecked())
+        self.compositeThread = QThread()
+        self.compositeObject.moveToThread(self.compositeThread)
+        self.compositeThread.started.connect(self.compositeObject.process)
+        self.compositeObject.message.connect(self.thread_message)
+        self.compositeObject.progress.connect(self.thread_progress)
+        self.progressBar.setVisible(True)
+        self.compositeObject.finish_process.connect(self.finishComposite)
+        self.compositeThread.start()
+
+        # self.cancelBtn.setEnabled(True)
+        # self.cancelBtn.setVisible(True)
+
 
     def thread_message(self, value):
         self.statusbar.showMessage(value)
@@ -275,7 +383,7 @@ class Window(QMainWindow):
             self.pushButton_2.setEnabled(True)
             self.pushButton_3.setEnabled(True)
 
-            self.pushButton_5.setEnabled(True)
+
             self.pushButton_8.setEnabled(True)
             self.pushButton_10.setEnabled(True)
             self.pushButton_4.setEnabled(True)
@@ -287,14 +395,19 @@ class Window(QMainWindow):
             return
         popMenu = QMenu(self)
         deleteAction = QAction("删除",self)
-        saveAction = QAction("保存本地", self)
+        # saveAction = QAction("保存本地", self)
         titokAction = QAction("tiktok效果", self)
+
         popMenu.addAction(deleteAction)
-        popMenu.addAction(saveAction)
+        # popMenu.addAction(saveAction)
         popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
-        saveAction.triggered.connect(self.saveItem)
+        # saveAction.triggered.connect(self.saveItem)
         titokAction.triggered.connect(self.video.tiktok)
+        if curItem.audio:
+            AddMusic = QAction("提取音频")
+            popMenu.addAction(AddMusic)
+            AddMusic.triggered.connect(self.addToAudio)
         popMenu.exec(QCursor.pos())
 
     def createContextMenu2(self, pos):
@@ -304,14 +417,18 @@ class Window(QMainWindow):
             return
         popMenu = QMenu(self)
         deleteAction = QAction("删除", self)
-        saveAction = QAction("保存本地", self)
+        # saveAction = QAction("保存本地", self)
         titokAction = QAction("tiktok效果",self)
         popMenu.addAction(deleteAction)
-        popMenu.addAction(saveAction)
+        # popMenu.addAction(saveAction)
         popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
-        saveAction.triggered.connect(self.saveItem)
+        # saveAction.triggered.connect(self.saveItem)
         titokAction.triggered.connect(self.video.tiktok)
+        if curItem.audio:
+            AddMusic = QAction("提取音频")
+            popMenu.addAction(AddMusic)
+            AddMusic.triggered.connect(self.addToAudio)
         popMenu.exec(QCursor.pos())
 
     def createContextMenu3(self, pos):
@@ -327,23 +444,46 @@ class Window(QMainWindow):
 
     def deleteItem(self):
         ditem = self.cur_listWidget.takeItem(self.cur_listWidget.row(self.cur_listWidget.currentItem()))
+        if not self.cur_listWidget.count():
+            self.pushButton_8.setEnabled(False)
+            self.pushButton_10.setEnabled(False)
+            self.pushButton_4.setEnabled(False)
+            self.pushButton_3.setEnabled(False)
         del ditem
 
-    def saveItem(self):
-        self.processObject = ProcessObject(self.cur_listWidget.currentItem().video)
-        self.processThread = QThread()
-        self.processObject.moveToThread(self.processThread)
-        self.processObject.finish_process.connect(self.finishProcess)
-        self.processObject.message.connect(self.thread_message)
-        self.processObject.progress.connect(self.thread_progress)
-        self.processThread.started.connect(self.processObject.process)
-        self.progressBar.setVisible(True)
-        self.processThread.start()
+    def addToAudio(self):
+        newName = "(Audio)"+self.cur_listWidget.currentItem().text
+        item = MyListWidgetItem(clipName=newName, video=None, audio=self.cur_listWidget.currentItem().audio)
+        self.listWidget_3.addItem(item)
+        self.setupMedia(item)
 
-    def finishProcess(self):
+    # 保存该片段，因易产生读写冲突，暂不用
+    # def saveItem(self):
+    #    self.saveObject = SaveTemp(self.cur_listWidget.currentItem().video.copy())
+    #    self.saveThread = QThread()
+    #    self.saveObject.moveToThread(self.saveThread)
+    #    self.saveObject.finish_process.connect(self.finishProcess)
+    #    self.saveObject.message.connect(self.thread_message)
+    #    self.saveObject.progress.connect(self.thread_progress)
+    #    self.saveThread.started.connect(self.saveObject.process)
+    #    self.progressBar.setVisible(True)
+    #    self.saveThread.start()
+
+    def finishComposite(self):
         self.progressBar.setVisible(False)
-        self.processThread.quit()
-        self.processThread.wait()
+        for item in self.items:
+            item.setFlags(item.flags()|Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+        for item in self.items_2:
+            item.setFlags(item.flags()|Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+        for item in self.items_3:
+            item.setFlags(item.flags()|Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+        self.compositeThread.quit()
+        self.compositeThread.wait()
+
+    # def finishProcess(self):
+    #   self.progressBar.setVisible(False)
+    #    self.saveThread.quit()
+    #    self.saveThread.wait()
 
     def processFinish(self):
         self.state = State.FINISHED
@@ -365,7 +505,12 @@ class Window(QMainWindow):
             self.audio.setIndex(int(position / 10 * self.audio.fps / self.audio.buffersize))
 
     def updateDurationInfo(self, currentInfo):
-        duration = self.video_backend.duration if self.video_backend else self.audio_backend.duration
+        if self.video_backend:
+            duration = self.video_backend.duration
+        elif self.audio_backend:
+            duration = self.audio_backend.duration
+        else:
+            duration = 0
         if currentInfo or duration:
             currentTime = QTime((currentInfo / 3600) % 60, (currentInfo / 60) % 60,
                                 currentInfo % 60, (currentInfo * 1000) % 1000)
@@ -431,7 +576,6 @@ class Window(QMainWindow):
             self.listWidget_3.setCurrentItem(item)
             self.cur_listWidget = self.listWidget_3
             self.setupMedia(item)
-
 
     def setupMedia(self,item):
 
@@ -539,7 +683,6 @@ class Video(QObject):
         self.stride = 1 / self.fps
         self.duration = self.clip.duration if self.clip else ui.audio_backend.duration
 
-
     def work(self):
         self.timer = QTimer()
         self.timer.setTimerType(Qt.PreciseTimer)
@@ -549,7 +692,6 @@ class Video(QObject):
         self.timer.timeout.connect(ui.audio.update)
         self.timer.setInterval(1000*self.stride)
         self.timer.start()
-
 
     def updatetime(self):
         if self.t < self.duration:
@@ -568,18 +710,20 @@ class Video(QObject):
     def resume(self):
         self.timer.start(1000*self.stride)
 
-    def speed(self):
-        self.clip = speedx.speedx(self.clip, 2)
+    # def speed(self):
+    #     self.clip = self.clip.fx(vfx.speedx, self.clip, 2)
 
     def stop(self):
+        self.timer.stop()
         self.setT(0)
         q.queue.clear()
-        self.timer.stop()
+
 
     def tiktok(self):
-        if isinstance(self.clip,VideoFileClip):
+        if isinstance(self.clip, VideoFileClip):
             self.clip = self.clip.fl_image(tiktok_effect)
             ui.cur_listWidget.currentItem().setClip(self.clip, self.clip.audio)
+            ui.openGLWidget.update()
 
 
     def setClip(self, clip):
@@ -602,50 +746,17 @@ class Video(QObject):
         self.t_changed.emit(self.t * 10)
 
 
-class MyBarLogger(ProgressBarLogger):
-
-    def __init__(self, message, progress):
-        self.message = message
-        self.progress = progress
-        super(MyBarLogger, self).__init__()
-
-    def callback(self, **changes):
-        bars = self.state.get('bars')
-        index = len(bars.values()) - 1
-        if index > -1:
-            bar = list(bars.values())[index]
-            progress = int(bar['index'] / bar['total'] * 100)
-            self.progress.emit(progress)
-        if 'message' in changes: self.message.emit(changes['message'])
-
-class ProcessObject(QObject):
-    finish_process = pyqtSignal()
-    progress = pyqtSignal(int)
-    message = pyqtSignal(str)
-
-    def __init__(self, clip, parent=None):
-        super(ProcessObject, self).__init__(parent)
-        self.clip = clip
-
-    def process(self):
-        if isinstance(self.clip,VideoClip):
-            myLogger = MyBarLogger(self.message,self.progress)
-            self.clip.write_videofile(f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4',codec='mpeg4',
-                audio_codec="libmp3lame",
-                bitrate="8000k",
-                threads=4,logger=myLogger)
-            self.finish_process.emit()
-
-
-q = queue.Queue()
-
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    font = QFont("Microsoft YaHei", 8)
+    app.setFont(font)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     fmt = QSurfaceFormat()
     fmt.setSamples(4)
+    q = queue.Queue()
     QSurfaceFormat.setDefaultFormat(fmt)
     ui = Window()
+    ui.setObjectName("ui")
     ui.resize(800, 800)
     ui.show()
 
