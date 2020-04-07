@@ -64,7 +64,6 @@ class MyListWidgetItem(QListWidgetItem):
         self.duration = self.video.duration if self.video else self.audio.duration
         self.setSizeHint(QSize(self.duration * 15, listHeight))
 
-
     def setClip(self, video=None, audio=None):
         self.video = video
         self.audio = audio
@@ -117,11 +116,9 @@ class CompositeObject(QObject):
         red_clip = ColorClip(clip.size, (255, 0, 0), duration=clip.duration)
         blue_clip = ColorClip(clip.size, (0, 0, 255), duration=clip.duration)
 
-        n_height = 0.9 * height
-
-        center_person_clip = clip.set_mask(mask_clip).set_position("center","center").fx(vfx.resize,height=n_height)
-        left_person_clip = red_clip.set_mask(mask_clip).set_opacity(0.5).fx(vfx.resize, height=n_height)
-        right_person_clip = blue_clip.set_mask(mask_clip).set_opacity(0.5).fx(vfx.resize, height=n_height)
+        center_person_clip = clip.set_mask(mask_clip).set_position("center", "center")
+        left_person_clip = red_clip.set_mask(mask_clip).set_opacity(0.5)
+        right_person_clip = blue_clip.set_mask(mask_clip).set_opacity(0.5)
 
         left_person_clip_x = (width / 2 - left_person_clip.w / 2) - int(left_person_clip.w * 0.3)
         right_person_clip_x = (width / 2 - left_person_clip.w / 2) + int(left_person_clip.w * 0.3)
@@ -153,37 +150,43 @@ class CompositeObject(QObject):
             data = process(data, target_class=[0])
             result = custom_show(_frame, data['masks'])
             return result
-        if not self.triple:
-            for i in range(len(self.targets)):
-                self.targets[i] = self.targets[i].fx(vfx.resize, height=self.height)
+
+        for i in range(len(self.targets)):
+            self.targets[i] = self.targets[i].fx(vfx.resize, height=self.height)
         for i in range(len(self.backgrounds)):
             self.backgrounds[i] = self.backgrounds[i].fx(vfx.resize, (self.width, self.height))
 
         target = concatenate_videoclips(self.targets, method="compose").without_audio()
-        if self.gauss_target:
-            target = target.fl_image(blur)
+
         background = concatenate_videoclips(self.backgrounds).without_audio()
-        if self.gauss_background:
-            background = background.fl_image(blur)
+
         audio = None
         duration = min(target.duration, background.duration)
         if self.audios:
             audio = concatenate_audioclips(self.audios)
             duration = min(target.duration, background.duration, audio.duration)
-        mask_clip = target.fl_image(custom_frame).to_mask().without_audio()
-        if self.triple:
 
+        mask_clip = target.fl_image(custom_frame).to_mask().without_audio()
+
+        if self.gauss_target:
+            target = target.fl_image(blur)
+        if self.gauss_background:
+            background = background.fl_image(blur)
+
+        if self.tiktok:
+            target = target.fl_image(tiktok_effect)
+
+        if self.triple:
             temp = self.triple_effect(target, mask_clip, width=self.width, height=self.height)
             temp.insert(0, background)
         else:
-
             target = target.set_mask(mask_clip).set_position("center", "center")
             temp = [background, target]
+
         final_clip = CompositeVideoClip(temp).set_audio(audio). \
             set_duration(duration) if audio else CompositeVideoClip(temp)
 
-        if self.tiktok:
-            final_clip = final_clip.fl_image(tiktok_effect)
+
 
 
         final_clip.write_videofile(

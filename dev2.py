@@ -26,7 +26,8 @@ from visualize import tiktok_effect
 # 6.处理过程中未block涉及到的item，一旦操作它们就会产生冲突(通过设置item不可选似乎解决了，不过应该还要阻止导入正在处理的素材)
 # 7.写入文件不知道怎么在运行时停止
 # 8.默认是双通道立体声
-# 9.多素材拼接的尺寸似乎不合适？
+# 9.多素材拼接的尺寸似乎不合适？(处理前设置各素材高度为目标高度，保持纵横比拼接)
+# 10.片段大小固定，若太短几乎看不见
 
 # noinspection PyAttributeOutsideInit
 class Window(QMainWindow):
