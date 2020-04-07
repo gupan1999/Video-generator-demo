@@ -1,31 +1,32 @@
 import queue
 import sys
-import time
+
 import qdarkstyle
 from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtCore import QDir, QObject, pyqtSignal, QThread, QTimer, Qt, QTime, QPoint, QRect, QSize, QEvent
-from PyQt5.QtGui import QSurfaceFormat, QPainter, QImage, QOpenGLWindow, QIcon, QCursor, QFont
+from PyQt5.QtCore import QDir, QObject, pyqtSignal, QThread, QTimer, Qt, QTime, QRect
+from PyQt5.QtGui import QSurfaceFormat, QPainter, QImage, QCursor, QFont
 from PyQt5.QtWidgets import QMainWindow, QApplication, QStyle, QSizePolicy, QProgressBar, \
-    QFileDialog, QRubberBand, QOpenGLWidget, QListWidgetItem, QListWidget, QMessageBox, QMenu, QAction, QWidget, \
+    QFileDialog, QOpenGLWidget, QListWidget, QMessageBox, QMenu, QAction, QWidget, \
     QStatusBar, QDialogButtonBox
-from audio import Audio
 from moviepy.audio.io.AudioFileClip import AudioFileClip
-from moviepy.video.VideoClip import VideoClip
-from moviepy.audio.AudioClip import AudioClip
-import moviepy.video.fx.all as vfx
 from moviepy.video.io.VideoFileClip import VideoFileClip
 
-from utils import State, tiktok_effect, MyListWidgetItem, listHeight, CompositeObject
+from audio import Audio
+from utils import State, MyListWidgetItem, listHeight, CompositeObject
+
+from visualize import tiktok_effect
+
 
 # TODO: 一些问题
 # 1.删除正在播放的item后还能继续播放此clip。若这一行为空时currentitem为空，重复、原地切分都不行(已通过手动禁止解决)
 # 2.直接拖动进度条到最后可能会文件冲突,可能是计算video.t的问题
-# 3.暂停状态不必要地读取、重绘画面，使得处理此clip过程中可能冲突
+# 3.暂停状态不必要地读取、重绘画面，使得处理此clip过程中可能冲突(一旦处理开始，保护此clip并回退到初始状态以避免)
 # 4.Moviepy目前在windows下操作若干次后产生句柄错误
 # 5.音频流播放的设置不太懂
 # 6.处理过程中未block涉及到的item，一旦操作它们就会产生冲突(通过设置item不可选似乎解决了，不过应该还要阻止导入正在处理的素材)
 # 7.写入文件不知道怎么在运行时停止
 # 8.默认是双通道立体声
+# 9.多素材拼接的尺寸似乎不合适？
 
 # noinspection PyAttributeOutsideInit
 class Window(QMainWindow):
@@ -36,11 +37,10 @@ class Window(QMainWindow):
     set_audio = pyqtSignal(object, int, int, int)
     d_changed = pyqtSignal()
 
+    # 界面设定
     def setupUi(self):
         self.setWindowTitle("VideoEditor")
         self.centralwidget = QWidget(self)
-
-
 
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
@@ -193,10 +193,9 @@ class Window(QMainWindow):
         # self.cancelBtn.setEnabled(False)
         self.statusbar.addPermanentWidget(self.progressBar)
         # self.statusbar.addPermanentWidget(self.cancelBtn)
-
-
         self.setStatusBar(self.statusbar)
 
+    # 各种状态
     def setupData(self):
         self.final_clip = None   #未用上
         self.audio_backend = None
@@ -268,6 +267,13 @@ class Window(QMainWindow):
         self.cur_listWidget.addItem(self.cur_listWidget.currentItem().copy())
 
     def setupPara(self):
+        def choose():
+            if self.gauss.isChecked():
+                self.gauss_target.setEnabled(True)
+                self.gauss_background.setEnabled(True)
+            else:
+                self.gauss_target.setEnabled(False)
+                self.gauss_background.setEnabled(False)
         if self.listWidget.count() and self.listWidget_2.count():
             self.dialog = QtWidgets.QDialog(self)
             self.dialog.setAttribute(Qt.WA_DeleteOnClose)
@@ -275,11 +281,22 @@ class Window(QMainWindow):
             self.dialog.setWindowTitle("准备合成")
             gridLayout = QtWidgets.QGridLayout(self.dialog)
             self.dialog.setLayout(gridLayout)
-            self.check = QtWidgets.QCheckBox("分身效果", self.dialog)
-            self.gauss = QtWidgets.QCheckBox("全局高斯模糊", self.dialog)
+            self.check = QtWidgets.QCheckBox("全局分身效果", self.dialog)
+            self.gauss = QtWidgets.QCheckBox("高斯模糊", self.dialog)
+            self.gauss_target = QtWidgets.QCheckBox("目标", self.dialog)
+            self.gauss_background = QtWidgets.QCheckBox("背景", self.dialog)
+
+            self.tiktok = QtWidgets.QCheckBox("抖音效果", self.dialog)
             sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+
+            self.gauss_target.setSizePolicy(sizePolicy)
+            self.gauss_background.setSizePolicy(sizePolicy)
             self.check.setSizePolicy(sizePolicy)
             self.gauss.setSizePolicy(sizePolicy)
+            self.tiktok.setSizePolicy(sizePolicy)
+            self.gauss.stateChanged.connect(choose)
+            self.gauss_target.setEnabled(False)
+            self.gauss_background.setEnabled(False)
             dialogbtns = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
             dialogbtns.button(QDialogButtonBox.Cancel).setText("取消")
             dialogbtns.button(QDialogButtonBox.Ok).setText("开始")
@@ -287,12 +304,18 @@ class Window(QMainWindow):
             dialogbtns.accepted.connect(self.dialog.accept)
             dialogbtns.accepted.connect(self.composite)
             dialogbtns.setSizePolicy(sizePolicy)
-            label = QtWidgets.QLabel()
+            label = QtWidgets.QLabel(self.dialog)
             label.setText("默认分辨率 1280x720")
+
             gridLayout.addWidget(self.check, 0, 0, 1, 1)
-            gridLayout.addWidget(dialogbtns, 3, 0, 1, 1)
-            gridLayout.addWidget(label, 2, 0, 1, 1)
+            gridLayout.addWidget(dialogbtns, 4, 0, 1, 3)
+            gridLayout.addWidget(label, 3, 0, 1, 1)
             gridLayout.addWidget(self.gauss, 1, 0, 1, 1)
+            gridLayout.addWidget(self.tiktok, 2, 0, 1, 1)
+
+            gridLayout.addWidget(self.gauss_target, 1, 1, 1, 1)
+            gridLayout.addWidget(self.gauss_background, 1, 2, 1, 1)
+
             self.dialog.resize(400, 300)
             self.dialog.show()
 
@@ -327,11 +350,7 @@ class Window(QMainWindow):
         self.cutter_start = 0
 
     def composite(self):
-        self.stop.emit()
-        self.audio_backend = None
-        self.video_backend = None
-        self.state = State.IDLE
-        self.fitState()
+        self.returnIDLE()
         targets, backgrounds, audios = [], [], []
 
         for i in range(self.listWidget.count()):
@@ -350,7 +369,9 @@ class Window(QMainWindow):
             self.items_3.append(item_3)
             item_3.setFlags(item.flags() & ((Qt.ItemIsSelectable | Qt.ItemIsEnabled) ^ 0xff))
 
-        self.compositeObject = CompositeObject(targets, backgrounds, audios, triple=self.check.isChecked(), gauss=self.gauss.isChecked())
+        self.compositeObject = CompositeObject(targets, backgrounds, audios, triple=self.check.isChecked(),
+                                               gauss=self.gauss.isChecked(), tiktok=self.tiktok.isChecked(),
+                                               gauss_target=self.gauss_target.isChecked(), gauss_background=self.gauss_background.isChecked())
         self.compositeThread = QThread()
         self.compositeObject.moveToThread(self.compositeThread)
         self.compositeThread.started.connect(self.compositeObject.process)
@@ -374,19 +395,28 @@ class Window(QMainWindow):
         if self.state == State.PLAYING:
             self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
             self.pushButton_8.setEnabled(False)
-
-        elif self.state in (State.PAUSE, State.IDLE, State.FINISHED):
+        elif self.state == State.FINISHED:
+            self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        elif self.state == State.PAUSE:
             self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
             self.pushButton_8.setEnabled(True)
         elif self.state == State.READY:
             self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
             self.pushButton_2.setEnabled(True)
             self.pushButton_3.setEnabled(True)
-
-
             self.pushButton_8.setEnabled(True)
             self.pushButton_10.setEnabled(True)
             self.pushButton_4.setEnabled(True)
+        elif self.state == State.IDLE:
+            self.audio_backend = None
+            self.video_backend = None
+            self.horizontalSlider.setRange(0, 0)
+            self.updateDurationInfo(0)
+            self.pushButton_2.setEnabled(False)
+            self.pushButton_3.setEnabled(False)
+            self.pushButton_4.setEnabled(False)
+            self.pushButton_10.setEnabled(False)
+            self.pushButton_8.setEnabled(False)
 
     def createContextMenu(self, pos):
         self.cur_listWidget = self.listWidget
@@ -442,13 +472,21 @@ class Window(QMainWindow):
         deleteAction.triggered.connect(self.deleteItem)
         popMenu.exec(QCursor.pos())
 
+    def returnIDLE(self):
+        if self.calthread.isRunning()and self.video.timer.isActive():
+            self.stop.emit()
+        self.state = State.IDLE
+        self.fitState()
+
     def deleteItem(self):
+        if self.video_backend:
+            if self.cur_listWidget.currentItem().video == self.video_backend:
+                self.returnIDLE()
+        elif self.audio_backend:
+            if self.cur_listWidget.currentItem().audio == self.audio_backend:
+                self.returnIDLE()
         ditem = self.cur_listWidget.takeItem(self.cur_listWidget.row(self.cur_listWidget.currentItem()))
-        if not self.cur_listWidget.count():
-            self.pushButton_8.setEnabled(False)
-            self.pushButton_10.setEnabled(False)
-            self.pushButton_4.setEnabled(False)
-            self.pushButton_3.setEnabled(False)
+
         del ditem
 
     def addToAudio(self):
@@ -457,7 +495,7 @@ class Window(QMainWindow):
         self.listWidget_3.addItem(item)
         self.setupMedia(item)
 
-    # 保存该片段，因易产生读写冲突，暂不用
+    # 保存该片段到本地
     # def saveItem(self):
     #    self.saveObject = SaveTemp(self.cur_listWidget.currentItem().video.copy())
     #    self.saveThread = QThread()
@@ -706,6 +744,8 @@ class Video(QObject):
 
     def pause(self):
         self.timer.stop()
+        q.queue.clear()
+        self.t -= (2*self.stride)
 
     def resume(self):
         self.timer.start(1000*self.stride)
@@ -732,7 +772,6 @@ class Video(QObject):
         self.fps = self.clip.fps if self.clip else 30
         self.stride = 1 / self.fps
         self.duration = self.clip.duration if self.clip else ui.audio_backend.duration
-        del self.timer
         self.timer = QTimer()
         self.timer.setTimerType(Qt.PreciseTimer)
         if self.clip:

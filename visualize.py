@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 import numpy as np
+from skimage.filters import gaussian
 
+
+def random_color():
+    return tuple(np.random.randint(0, 255, 3))
 
 # def random_colors(N):
 #     np.random.seed(1)
@@ -109,5 +113,24 @@ def custom_show(image, masks):
     return image
 
 
+def tiktok_effect(frame):
+    # 单独抽取去掉红色通道的图像
+    gb_channel_frame = frame.copy()
+    gb_channel_frame[:, :, 0].fill(0)
 
+    # 单独抽取红色通道图像
+    r_channel_frame = frame.copy()
+    r_channel_frame[:, :, 1].fill(0)
+    r_channel_frame[:, :, 2].fill(0)
+
+    # 错位合并图像，形成抖音效果
+    result = frame.copy()
+    result[:-5, :-5, :] = r_channel_frame[:-5, :-5, :] + gb_channel_frame[5:, 5:, :]
+
+    return result
+
+
+def blur(image):
+    """ Returns a blurred (radius=2 pixels) version of the image """
+    return gaussian(image.astype(float), sigma=10)
 
