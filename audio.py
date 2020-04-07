@@ -5,8 +5,10 @@ import sounddevice as sd
 from PyQt5.QtCore import QObject
 
 
+# 播放音频的类，独占一子线程播放音频
 class Audio(QObject):
 
+    # 初始化音频片段
     def __init__(self, clip, fps=44100, buffersize=4000, nbytes=2):
         super(Audio, self).__init__()
         self.clip = clip
@@ -22,6 +24,7 @@ class Audio(QObject):
             self.totalsize = 0
             self.pospos = None
 
+    # 音频流开启
     def work(self):
         if self.clip:
             self.stream = sd.OutputStream(
@@ -29,6 +32,7 @@ class Audio(QObject):
                 dtype='int16')
             self.stream.start()
 
+    # 一段一段写入音频流至结束
     def update(self):
         if self.clip and self.index < len(self.pospos) - 1:
             t = (1.0 / self.fps) * np.arange(self.pospos[self.index], self.pospos[self.index + 1])
@@ -39,6 +43,7 @@ class Audio(QObject):
         else:
             self.index = 0
 
+    # 设置新音频片段
     def setClip(self, clip, fps=44100, buffersize=4000, nbytes=2):
 
         self.clip = clip
@@ -54,6 +59,7 @@ class Audio(QObject):
             self.pospos = None
         self.work()
 
+    # 控制音频播放进度
     def setIndex(self, i):
         self.index = i
 

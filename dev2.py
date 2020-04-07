@@ -31,12 +31,13 @@ from visualize import tiktok_effect
 
 # noinspection PyAttributeOutsideInit
 class Window(QMainWindow):
+    # 播放控制信号
     pause = pyqtSignal()
     resume = pyqtSignal()
     stop = pyqtSignal()
+    # 传递片段到已移动到子线程的视频、音频对象的信号
     set_video = pyqtSignal(object)
     set_audio = pyqtSignal(object, int, int, int)
-    d_changed = pyqtSignal()
 
     # 界面设定
     def setupUi(self):
@@ -92,8 +93,6 @@ class Window(QMainWindow):
         self.horizontalLayout.addWidget(self.pushButton_2)
         self.pushButton_4 = QtWidgets.QPushButton(self.centralwidget)
         self.horizontalLayout.addWidget(self.pushButton_4)
-
-
         self.pushButton_8 = QtWidgets.QPushButton(self.centralwidget)
         self.horizontalLayout.addWidget(self.pushButton_8)
         self.pushButton_10 = QtWidgets.QPushButton(self.centralwidget)
@@ -105,16 +104,12 @@ class Window(QMainWindow):
         self.pushButton_7.setText("打开目标")
         self.pushButton.setText("打开音频")
         self.pushButton_4.setText("设置切分起始时间")
-
-
         self.pushButton_8.setText("原地切分")
         self.pushButton_10.setText("重复")
         self.pushButton_3.setText("生成")
         self.pushButton_3.setEnabled(False)
         self.pushButton_2.setEnabled(False)
-
         self.pushButton_4.setEnabled(False)
-
         self.pushButton_10.setEnabled(False)
         self.pushButton_8.setEnabled(False)
 
@@ -188,38 +183,34 @@ class Window(QMainWindow):
         self.progressBar.setVisible(False)
         self.progressBar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.progressBar.setFixedHeight(20)
-        # self.cancelBtn = QtWidgets.QPushButton()
-        # self.cancelBtn.setText("取消")
-        # self.cancelBtn.setVisible(False)
-        # self.cancelBtn.setEnabled(False)
         self.statusbar.addPermanentWidget(self.progressBar)
-        # self.statusbar.addPermanentWidget(self.cancelBtn)
         self.setStatusBar(self.statusbar)
 
-    # 各种状态
     def setupData(self):
-        self.final_clip = None   #未用上
+        # 记录当前播放视频、音频
         self.audio_backend = None
         self.video_backend = None
-        self.audio = None
+        # 切分起始结束时刻
         self.cutter_end = 0
         self.cutter_start = 0
+        # 当前选中的行
         self.cur_listWidget = None
-        self.flag = 0
-        self.calthread = None
+
+        # 播放、处理音视频的子线程及相应对象
         self.video = None
         self.audio = None
+        self.calthread = None
         self.audioThread = None
-        self.saveThread = None
-        self.saveObject = None
-        self.processObject = None
-        self.state = State.IDLE
         self.compositeObject = None
         self.compositeThread = None
+        # 状态变量
+        self.flag = 0
+        self.state = State.IDLE
+
+        # 要处理的所有片段
         self.items, self.items_2, self.items_3 = [], [], []
 
-
-
+    # 各信号与触发的相应函数绑定
     def setupSlot(self):
         self.pushButton.clicked.connect(self.openAudio)
         self.pushButton_7.clicked.connect(self.openTarget)
@@ -238,7 +229,6 @@ class Window(QMainWindow):
         self.listWidget.customContextMenuRequested.connect(self.createContextMenu)
         self.listWidget_2.customContextMenuRequested.connect(self.createContextMenu2)
         self.listWidget_3.customContextMenuRequested.connect(self.createContextMenu3)
-        # self.cancelBtn.clicked.connect(self.terminate)
 
     def __init__(self):
         super(Window, self).__init__()
@@ -246,6 +236,7 @@ class Window(QMainWindow):
         self.setupUi()
         self.setupSlot()
 
+    # 设置切分起始时间并显示
     def setStart(self):
         self.cutter_start = self.video.t
         duration = self.video_backend.duration if self.video_backend else self.audio_backend.duration
@@ -254,6 +245,7 @@ class Window(QMainWindow):
         tStr = currentTime.toString(format)
         self.statusbar.showMessage("设置起始时间%s" % tStr, 1000)
 
+    # 关闭窗口前清理子线程
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.stop.emit()
         if self.calthread:
@@ -264,10 +256,13 @@ class Window(QMainWindow):
             self.audioThread.wait()
         super().closeEvent(a0)
 
+    # 重复添加选中的item
     def copySelected(self):
         self.cur_listWidget.addItem(self.cur_listWidget.currentItem().copy())
 
+    # 在对话框里设置处理参数
     def setupPara(self):
+
         def choose():
             if self.gauss.isChecked():
                 self.gauss_target.setEnabled(True)
@@ -275,6 +270,8 @@ class Window(QMainWindow):
             else:
                 self.gauss_target.setEnabled(False)
                 self.gauss_background.setEnabled(False)
+
+        # 至少选择了目标和背景才能在对话框里设置处理参数
         if self.listWidget.count() and self.listWidget_2.count():
             self.dialog = QtWidgets.QDialog(self)
             self.dialog.setAttribute(Qt.WA_DeleteOnClose)
@@ -286,8 +283,8 @@ class Window(QMainWindow):
             self.gauss = QtWidgets.QCheckBox("高斯模糊", self.dialog)
             self.gauss_target = QtWidgets.QCheckBox("目标", self.dialog)
             self.gauss_background = QtWidgets.QCheckBox("背景", self.dialog)
-
             self.tiktok = QtWidgets.QCheckBox("抖音效果", self.dialog)
+
             sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
             self.gauss_target.setSizePolicy(sizePolicy)
@@ -313,17 +310,13 @@ class Window(QMainWindow):
             gridLayout.addWidget(label, 3, 0, 1, 1)
             gridLayout.addWidget(self.gauss, 1, 0, 1, 1)
             gridLayout.addWidget(self.tiktok, 2, 0, 1, 1)
-
             gridLayout.addWidget(self.gauss_target, 1, 1, 1, 1)
             gridLayout.addWidget(self.gauss_background, 1, 2, 1, 1)
 
             self.dialog.resize(400, 300)
             self.dialog.show()
 
-    # def terminate(self):
-    #     self.compositeThread.quit()
-    #     self.compositeThread.wait(500)
-
+    # 若当前进度大于切分起始时间，则对当前播放片段原地切分
     def cut(self):
         if self.video.t <= self.cutter_start:
             QMessageBox.critical(self, "警告", "请在起始时间之后切分")
@@ -350,10 +343,12 @@ class Window(QMainWindow):
 
         self.cutter_start = 0
 
+    # 准备生成
     def composite(self):
+        # 为防止读写冲突，保护所有待处理片段，先重置回初始状态
         self.returnIDLE()
         targets, backgrounds, audios = [], [], []
-
+        # 将所有待处理片段的item置为不可选中且不可用，并存储这些片段准备让子线程处理
         for i in range(self.listWidget.count()):
             item = self.listWidget.item(i)
             targets.append(item.video)
@@ -370,6 +365,7 @@ class Window(QMainWindow):
             self.items_3.append(item_3)
             item_3.setFlags(item.flags() & ((Qt.ItemIsSelectable | Qt.ItemIsEnabled) ^ 0xff))
 
+        # 传递待处理片段及相关参数，绑定开始、结束、处理进度的函数
         self.compositeObject = CompositeObject(targets, backgrounds, audios, triple=self.check.isChecked(),
                                                gauss=self.gauss.isChecked(), tiktok=self.tiktok.isChecked(),
                                                gauss_target=self.gauss_target.isChecked(), gauss_background=self.gauss_background.isChecked())
@@ -382,16 +378,14 @@ class Window(QMainWindow):
         self.compositeObject.finish_process.connect(self.finishComposite)
         self.compositeThread.start()
 
-        # self.cancelBtn.setEnabled(True)
-        # self.cancelBtn.setVisible(True)
-
-
+    # 显示消息和进度
     def thread_message(self, value):
         self.statusbar.showMessage(value)
 
     def thread_progress(self, value):
         self.progressBar.setValue(value)
 
+    # 状态改变时需要的操作
     def fitState(self):
         if self.state == State.PLAYING:
             self.pushButton_2.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
@@ -419,21 +413,18 @@ class Window(QMainWindow):
             self.pushButton_10.setEnabled(False)
             self.pushButton_8.setEnabled(False)
 
+    # 各片段右键菜单所能进行的简单预处理
     def createContextMenu(self, pos):
         self.cur_listWidget = self.listWidget
         curItem = self.listWidget.itemAt(pos)
         if not curItem or self.state == State.PLAYING:
             return
         popMenu = QMenu(self)
-        deleteAction = QAction("删除",self)
-        # saveAction = QAction("保存本地", self)
+        deleteAction = QAction("删除", self)
         titokAction = QAction("tiktok效果", self)
-
         popMenu.addAction(deleteAction)
-        # popMenu.addAction(saveAction)
         popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
-        # saveAction.triggered.connect(self.saveItem)
         titokAction.triggered.connect(self.video.tiktok)
         if curItem.audio:
             AddMusic = QAction("提取音频")
@@ -448,13 +439,10 @@ class Window(QMainWindow):
             return
         popMenu = QMenu(self)
         deleteAction = QAction("删除", self)
-        # saveAction = QAction("保存本地", self)
-        titokAction = QAction("tiktok效果",self)
+        titokAction = QAction("tiktok效果", self)
         popMenu.addAction(deleteAction)
-        # popMenu.addAction(saveAction)
         popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
-        # saveAction.triggered.connect(self.saveItem)
         titokAction.triggered.connect(self.video.tiktok)
         if curItem.audio:
             AddMusic = QAction("提取音频")
@@ -479,6 +467,7 @@ class Window(QMainWindow):
         self.state = State.IDLE
         self.fitState()
 
+    # 删除item，若删除的是现在正在播放的，回退到初始状态以防止错误
     def deleteItem(self):
         if self.video_backend:
             if self.cur_listWidget.currentItem().video == self.video_backend:
@@ -490,24 +479,14 @@ class Window(QMainWindow):
 
         del ditem
 
+    # 将目标或背景的音频添加为音频行的item
     def addToAudio(self):
         newName = "(Audio)"+self.cur_listWidget.currentItem().text
         item = MyListWidgetItem(clipName=newName, video=None, audio=self.cur_listWidget.currentItem().audio)
         self.listWidget_3.addItem(item)
         self.setupMedia(item)
 
-    # 保存该片段到本地
-    # def saveItem(self):
-    #    self.saveObject = SaveTemp(self.cur_listWidget.currentItem().video.copy())
-    #    self.saveThread = QThread()
-    #    self.saveObject.moveToThread(self.saveThread)
-    #    self.saveObject.finish_process.connect(self.finishProcess)
-    #    self.saveObject.message.connect(self.thread_message)
-    #    self.saveObject.progress.connect(self.thread_progress)
-    #    self.saveThread.started.connect(self.saveObject.process)
-    #    self.progressBar.setVisible(True)
-    #    self.saveThread.start()
-
+    # 结束生成后，使相关item重新可交互并清除工作线程
     def finishComposite(self):
         self.progressBar.setVisible(False)
         for item in self.items:
@@ -519,37 +498,40 @@ class Window(QMainWindow):
         self.compositeThread.quit()
         self.compositeThread.wait()
 
-    # def finishProcess(self):
-    #   self.progressBar.setVisible(False)
-    #    self.saveThread.quit()
-    #    self.saveThread.wait()
-
+    # 播放结束
     def processFinish(self):
         self.state = State.FINISHED
         self.fitState()
 
+    # 播放进度改变时移动进度条滑块并记录时间
     def positionChanged(self, position):
         self.horizontalSlider.setValue(position)
         self.updateDurationInfo(position / 10)
 
+    # 播放对象改变时重设时间信息
     def durationChanged(self, duration):
         self.horizontalSlider.setRange(0, duration * 10)
         self.updateDurationInfo(0)
 
+    # 控制视频播放进度
     def setPosition(self, position):
         self.video.setT(position / 10)
 
+    # 控制音频播放进度
     def setApos(self, position):
         if self.audio_backend:
             self.audio.setIndex(int(position / 10 * self.audio.fps / self.audio.buffersize))
 
+    # 更新时间信息
     def updateDurationInfo(self, currentInfo):
+        # 正确计算时长
         if self.video_backend:
             duration = self.video_backend.duration
         elif self.audio_backend:
             duration = self.audio_backend.duration
         else:
             duration = 0
+        # 计算当前时间和总时间并显示
         if currentInfo or duration:
             currentTime = QTime((currentInfo / 3600) % 60, (currentInfo / 60) % 60,
                                 currentInfo % 60, (currentInfo * 1000) % 1000)
@@ -562,34 +544,33 @@ class Window(QMainWindow):
             tStr = ""
         self.label.setText(tStr)
 
+    # 切换要播放的item
     def setupTarget(self, item):
-
         if self.state != State.IDLE:
             self.stop.emit()
-
         self.setupMedia(item)
         self.fitState()
         self.cur_listWidget = item.listWidget()
 
+    # 打开目标文件
     def openTarget(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Video", QDir.homePath(),
-                                                  "Video(*.mp4;*.wmv;*.rmvb;*.avi;*.mkv)")
-
+                                                  "Video(*.mp4;*.wmv;*.rmvb;*.avi;*.mkv;*.mov;*.mpeg;*.flv;*.rm;*.mpeg;*.mpg)")
         if fileName != '':
             if self.state != State.IDLE:
                 self.stop.emit()
 
             v = VideoFileClip(fileName)
             item = MyListWidgetItem(fileName.split("/")[-1], v, v.audio)
-
             self.listWidget.addItem(item)
             self.listWidget.setCurrentItem(item)
             self.cur_listWidget = self.listWidget
             self.setupMedia(item)
 
+    # 打开背景文件
     def openBackground(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Video", QDir.homePath(),
-                                                  "Video(*.mp4;*.wmv;*.rmvb;*.avi;*.mkv)")
+                                                  "Video(*.mp4;*.wmv;*.rmvb;*.avi;*.mkv;*.mov;*.mpeg;*.flv;*.rm;*.mpeg;*.mpg)")
         if fileName != '':
             if self.state != State.IDLE:
                 self.stop.emit()
@@ -602,9 +583,10 @@ class Window(QMainWindow):
             self.cur_listWidget = self.listWidget_2
             self.setupMedia(item)
 
+    # 打开音频文件
     def openAudio(self):
-        fileName, _ = QFileDialog.getOpenFileName(self, "Open Video", QDir.homePath(),
-                                                  "Audio(*.mp3;*.wav;)")
+        fileName, _ = QFileDialog.getOpenFileName(self, "Open Audio", QDir.homePath(),
+                                                  "Audio(*.mp3;*.wav;*.ogg;*.wma;)")
         if fileName != '':
             if self.state != State.IDLE:
                 self.stop.emit()
@@ -616,11 +598,12 @@ class Window(QMainWindow):
             self.cur_listWidget = self.listWidget_3
             self.setupMedia(item)
 
-    def setupMedia(self,item):
-
+    # 设置要播放的视频、音频信息
+    def setupMedia(self, item):
         duration = item.video.duration if item.video else item.audio.duration
         self.video_backend = item.video
         self.audio_backend = item.audio
+        # 还没有播放过片段，建立子线程并初始化相应对象
         if self.flag == 0:
             self.video = Video(item.video)
             self.durationChanged(duration)
@@ -635,13 +618,13 @@ class Window(QMainWindow):
             self.set_video.connect(self.video.setClip)
             self.audioThread = QThread()
             if self.audio_backend:
-                self.audio = Audio(clip=item.audio, fps=item.audio.fps, buffersize=int(1.0 / self.video.fps * item.audio.fps), nbytes=2)
+                self.audio = Audio(clip=item.audio, fps=item.audio.fps, buffersize=int(1.0 / self.video.fps * item.audio. fps), nbytes=2)
             else:
                 self.audio = Audio(clip=None, fps=0, buffersize=0, nbytes=0)
             self.audio.moveToThread(self.audioThread)
             self.audioThread.started.connect(self.audio.work)
             self.set_audio.connect(self.audio.setClip)
-
+        # 已经播放过，此时视频线程与音频线程均存在，设置相应对象信息即可
         else:
             v_fps = item.video.fps if item.video else 30
 
@@ -663,36 +646,35 @@ class Window(QMainWindow):
         self.state = State.READY
         self.fitState()
 
+    # 点击播放键时根据状态实施相应行为
     def play(self):
         self.flag += 1
         if self.state in (State.FINISHED, State.READY):
             self.state = State.PLAYING
             self.fitState()
             if self.flag == 1:
-                print("Start")
                 self.calthread.start()
                 self.audioThread.start()
             else:
-                print("Running")
                 self.resume.emit()
 
         elif self.state == State.PLAYING:
-            print("Pause")
             self.state = State.PAUSE
             self.pause.emit()
             self.fitState()
         elif self.state == State.PAUSE:
-            print("Resume")
             self.resume.emit()
             self.state = State.PLAYING
             self.fitState()
 
 
+# 用于播放视频的自定义控件
 class MyOpenGLWidget(QOpenGLWidget):
 
     def __init__(self, parent=None):
         super(MyOpenGLWidget, self).__init__(parent)
 
+    # 播放状态下不断从队列获得要播放的视频数据，而暂停状态下只在需要时重绘当前进度的画面
     def paintEvent(self, e: QtGui.QPaintEvent) -> None:
         if not q.empty() and ui.state == State.PLAYING:
             painter = QPainter()
@@ -710,10 +692,12 @@ class MyOpenGLWidget(QOpenGLWidget):
             painter.end()
 
 
+# 在子线程中定时读取视频数据的对象
 class Video(QObject):
     finish = pyqtSignal()
     t_changed = pyqtSignal(int)
 
+    # 初始化视频信息
     def __init__(self, clip):
         super(Video, self).__init__()
         self.clip = clip
@@ -722,6 +706,7 @@ class Video(QObject):
         self.stride = 1 / self.fps
         self.duration = self.clip.duration if self.clip else ui.audio_backend.duration
 
+    # 设置定时器，定时画视频帧并提醒音频对象同步读取
     def work(self):
         self.timer = QTimer()
         self.timer.setTimerType(Qt.PreciseTimer)
@@ -732,6 +717,7 @@ class Video(QObject):
         self.timer.setInterval(1000*self.stride)
         self.timer.start()
 
+    # 根据进度入队新视频数据，若超时长则结束
     def updatetime(self):
         if self.t < self.duration:
             if self.clip:
@@ -751,22 +737,19 @@ class Video(QObject):
     def resume(self):
         self.timer.start(1000*self.stride)
 
-    # def speed(self):
-    #     self.clip = self.clip.fx(vfx.speedx, self.clip, 2)
-
     def stop(self):
         self.timer.stop()
         self.setT(0)
         q.queue.clear()
 
-
+    # 某一片段的抖音效果
     def tiktok(self):
         if isinstance(self.clip, VideoFileClip):
             self.clip = self.clip.fl_image(tiktok_effect)
             ui.cur_listWidget.currentItem().setClip(self.clip, self.clip.audio)
             ui.openGLWidget.update()
 
-
+    # 设置要播放的新视频
     def setClip(self, clip):
         self.clip = clip
         self.setT(0)
@@ -781,11 +764,13 @@ class Video(QObject):
         self.timer.timeout.connect(ui.audio.update)
         self.timer.setInterval(1000 * self.stride)
 
+    # 调整播放进度
     def setT(self, t):
         self.t = t
         self.t_changed.emit(self.t * 10)
 
 
+# 应用启动设置
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     font = QFont("Microsoft YaHei", 8)
