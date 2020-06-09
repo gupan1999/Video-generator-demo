@@ -1,11 +1,10 @@
 import os
 import torch
 
-from Editorwindow2 import custom_frame1
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from projects.PointRend.point_rend import add_pointrend_config
-from visualize import process, custom_show1, custom_show
+from visualize import process, custom_show
 from moviepy.editor import VideoFileClip, CompositeVideoClip
 import time
 
@@ -25,17 +24,18 @@ video_name = '蔡徐坤.mp4'
 input_path = os.path.join('input/', video_name)
 basename = os.path.splitext(video_name)[0]
 suffix = os.path.splitext(video_name)[1]
-
-
-
-
-
+n=0
+N=0
 def custom_frame(frame):
     _frame = frame.copy()
     output = predictor(_frame)
     instances = output['instances'].to('cpu')
+
     data = {'classes': instances.pred_classes.numpy(), 'boxes': instances.pred_boxes.tensor.numpy(), 'masks':instances.pred_masks.numpy() , 'scores': instances.scores.numpy()}
     data = process(data, target_class=[0])
+    if data:
+        N += 1
+    n +=1
     result = custom_show(_frame,  data['masks'])
     return result
 
@@ -55,4 +55,4 @@ final_clip.write_videofile(
 	threads=4,
 )
 
-
+print("a person play basketball in %d frames, %d frames are successfully detected" % (n,N))

@@ -10,7 +10,7 @@ import tqdm
 from detectron2.config import get_cfg
 from detectron2.data.detection_utils import read_image
 from detectron2.utils.logger import setup_logger
-
+from projects.PointRend.point_rend import add_pointrend_config
 from predictor import VisualizationDemo
 
 # constants
@@ -20,6 +20,7 @@ WINDOW_NAME = "COCO detections"
 def setup_cfg(args):
     # load config from file and command-line arguments
     cfg = get_cfg()
+    add_pointrend_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     # Set score_threshold for builtin models
@@ -157,3 +158,4 @@ if __name__ == "__main__":
             output_file.release()
         else:
             cv2.destroyAllWindows()
+constant= cv2.imwrite
