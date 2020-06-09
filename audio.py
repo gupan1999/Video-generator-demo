@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
 import numpy as np
 import sounddevice as sd
 from PyQt5.QtCore import QObject

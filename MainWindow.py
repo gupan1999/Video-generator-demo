@@ -1,33 +1,18 @@
 import queue
 import sys
-
 import qdarkstyle
 from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtCore import QDir, QObject, pyqtSignal, QThread, QTimer, Qt, QTime, QRect
+from PyQt5.QtCore import QDir, QObject, pyqtSignal, QThread, QTimer, Qt, QTime, QRect, QSize
 from PyQt5.QtGui import QSurfaceFormat, QPainter, QImage, QCursor, QFont
 from PyQt5.QtWidgets import QMainWindow, QApplication, QStyle, QSizePolicy, QProgressBar, \
     QFileDialog, QOpenGLWidget, QListWidget, QMessageBox, QMenu, QAction, QWidget, \
     QStatusBar, QDialogButtonBox
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.video.io.VideoFileClip import VideoFileClip
-
 from audio import Audio
-from utils import State, MyListWidgetItem, listHeight, CompositeObject
-
+from utils import State, MyListWidgetItem, listHeight, CompositeObject, SaveTemp
 from visualize import tiktok_effect
 
-
-# TODO: 一些问题
-# 1.删除正在播放的item后还能继续播放此clip。若这一行为空时currentitem为空，重复、原地切分都不行(已通过手动禁止解决)
-# 2.直接拖动进度条到最后可能会文件冲突,可能是计算video.t的问题
-# 3.暂停状态不必要地读取、重绘画面，使得处理此clip过程中可能冲突(一旦处理开始，保护此clip并回退到初始状态以避免)
-# 4.Moviepy目前在windows下操作若干次后产生句柄错误
-# 5.音频流播放的设置不太懂
-# 6.处理过程中未block涉及到的item，一旦操作它们就会产生冲突(通过设置item不可选似乎解决了，不过应该还要阻止导入正在处理的素材)
-# 7.写入文件不知道怎么在运行时停止
-# 8.默认是双通道立体声
-# 9.多素材拼接的尺寸似乎不合适？(处理前设置各素材高度为目标高度，保持纵横比拼接)
-# 10.片段大小固定，若太短几乎看不见
 
 # noinspection PyAttributeOutsideInit
 class Window(QMainWindow):
@@ -41,7 +26,7 @@ class Window(QMainWindow):
 
     # 界面设定
     def setupUi(self):
-        self.setWindowTitle("VideoEditor")
+        self.setWindowTitle("VideoGenerator")
         self.centralwidget = QWidget(self)
 
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
@@ -186,6 +171,25 @@ class Window(QMainWindow):
         self.statusbar.addPermanentWidget(self.progressBar)
         self.setStatusBar(self.statusbar)
 
+    # 保存该片段到本地
+    def saveItem(self):
+        self.returnIDLE()
+        item = self.cur_listWidget.currentItem()
+        self.saveitem = item
+        if item.video:
+            self.saveObject = SaveTemp(item.video.copy())
+        else:
+            self.saveObject = SaveTemp(item.audio.copy())
+        item.setFlags(item.flags() & ((Qt.ItemIsSelectable | Qt.ItemIsEnabled) ^ 0xff))
+        self.saveThread = QThread()
+        self.saveObject.moveToThread(self.saveThread)
+        self.saveObject.finish_process.connect(self.finishSave)
+        self.saveObject.message.connect(self.thread_message)
+        self.saveObject.progress.connect(self.thread_progress)
+        self.saveThread.started.connect(self.saveObject.process)
+        self.progressBar.setVisible(True)
+        self.saveThread.start()
+
     def setupData(self):
         # 记录当前播放视频、音频
         self.audio_backend = None
@@ -206,9 +210,12 @@ class Window(QMainWindow):
         # 状态变量
         self.flag = 0
         self.state = State.IDLE
+        self.saveObject = None
+        self.saveThread = None
 
         # 要处理的所有片段
         self.items, self.items_2, self.items_3 = [], [], []
+        self.saveitem = None
 
     # 各信号与触发的相应函数绑定
     def setupSlot(self):
@@ -315,6 +322,12 @@ class Window(QMainWindow):
 
             self.dialog.resize(400, 300)
             self.dialog.show()
+
+    def finishSave(self):
+        self.progressBar.setVisible(False)
+        self.saveitem.setFlags(self.saveitem.flags()|Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+        self.saveThread.quit()
+        self.saveThread.wait()
 
     # 若当前进度大于切分起始时间，则对当前播放片段原地切分
     def cut(self):
@@ -426,6 +439,9 @@ class Window(QMainWindow):
         popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
         titokAction.triggered.connect(self.video.tiktok)
+        saveAction = QAction("保存本地", self)
+        popMenu.addAction(saveAction)
+        saveAction.triggered.connect(self.saveItem)
         if curItem.audio:
             AddMusic = QAction("提取音频")
             popMenu.addAction(AddMusic)
@@ -444,6 +460,9 @@ class Window(QMainWindow):
         popMenu.addAction(titokAction)
         deleteAction.triggered.connect(self.deleteItem)
         titokAction.triggered.connect(self.video.tiktok)
+        saveAction = QAction("保存本地", self)
+        popMenu.addAction(saveAction)
+        saveAction.triggered.connect(self.saveItem)
         if curItem.audio:
             AddMusic = QAction("提取音频")
             popMenu.addAction(AddMusic)
@@ -458,9 +477,13 @@ class Window(QMainWindow):
         popMenu = QMenu(self)
         deleteAction = QAction("删除", self)
         popMenu.addAction(deleteAction)
+        saveAction = QAction("保存本地", self)
+        popMenu.addAction(saveAction)
+        saveAction.triggered.connect(self.saveItem)
         deleteAction.triggered.connect(self.deleteItem)
         popMenu.exec(QCursor.pos())
 
+    # 回退到初始状态
     def returnIDLE(self):
         if self.calthread.isRunning()and self.video.timer.isActive():
             self.stop.emit()
@@ -476,7 +499,6 @@ class Window(QMainWindow):
             if self.cur_listWidget.currentItem().audio == self.audio_backend:
                 self.returnIDLE()
         ditem = self.cur_listWidget.takeItem(self.cur_listWidget.row(self.cur_listWidget.currentItem()))
-
         del ditem
 
     # 将目标或背景的音频添加为音频行的item
@@ -561,6 +583,7 @@ class Window(QMainWindow):
                 self.stop.emit()
 
             v = VideoFileClip(fileName)
+
             item = MyListWidgetItem(fileName.split("/")[-1], v, v.audio)
             self.listWidget.addItem(item)
             self.listWidget.setCurrentItem(item)
@@ -692,6 +715,7 @@ class MyOpenGLWidget(QOpenGLWidget):
             painter.end()
 
 
+
 # 在子线程中定时读取视频数据的对象
 class Video(QObject):
     finish = pyqtSignal()
@@ -731,7 +755,7 @@ class Video(QObject):
 
     def pause(self):
         self.timer.stop()
-        q.queue.clear()
+
         self.t -= (2*self.stride)
 
     def resume(self):
@@ -740,7 +764,7 @@ class Video(QObject):
     def stop(self):
         self.timer.stop()
         self.setT(0)
-        q.queue.clear()
+
 
     # 某一片段的抖音效果
     def tiktok(self):
@@ -767,6 +791,7 @@ class Video(QObject):
     # 调整播放进度
     def setT(self, t):
         self.t = t
+
         self.t_changed.emit(self.t * 10)
 
 

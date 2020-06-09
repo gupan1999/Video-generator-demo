@@ -1,20 +1,16 @@
-#!/usr/bin/env python
-# coding: utf-8
-
+import os
 import time
 from enum import Enum, unique
-
 import moviepy.video.fx.all as vfx
 import torch
+import decorator
 from PyQt5.QtCore import QSize, QObject, pyqtSignal
 from PyQt5.QtWidgets import QListWidgetItem
-
-from moviepy.audio.AudioClip import concatenate_audioclips
-from moviepy.video.VideoClip import ColorClip
+from moviepy.audio.AudioClip import concatenate_audioclips, AudioClip
+from moviepy.video.VideoClip import ColorClip, VideoClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
 from moviepy.video.compositing.concatenate import concatenate_videoclips
 from proglog import ProgressBarLogger
-
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultPredictor
 from projects.PointRend.point_rend import add_pointrend_config
@@ -49,6 +45,13 @@ class State(Enum):
 
 
 listHeight = 60
+
+
+@decorator.decorator
+def check_outpath(f, *args, **kargs):
+    if not os.path.exists("output"):
+        os.makedirs("output")
+    return f(*args, **kargs)
 
 
 # 存储界面上各片段音视频信息，与用户交互的item
@@ -87,7 +90,8 @@ class MyBarLogger(ProgressBarLogger):
             bar = list(bars.values())[index]
             progress = int(bar['index'] / bar['total'] * 100)
             self.progress.emit(progress)
-        if 'message' in changes: self.message.emit(changes['message'])
+        if 'message' in changes:
+            self.message.emit(changes['message'])
 
 
 class CompositeObject(QObject):
@@ -128,6 +132,7 @@ class CompositeObject(QObject):
         right_person_clip = right_person_clip.set_position((right_person_clip_x, person_clip_y))
         return [left_person_clip, right_person_clip, center_person_clip]
 
+    @check_outpath
     def process(self):
 
         my_logger = MyBarLogger(self.message, self.progress)
@@ -155,8 +160,8 @@ class CompositeObject(QObject):
             instances = output['instances'].to('cpu')
             data = {'classes': instances.pred_classes.numpy(), 'boxes': instances.pred_boxes.tensor.numpy(),
                     'masks': instances.pred_masks.numpy(), 'scores': instances.scores.numpy()}
-            # 设定接收人的数据
-            data = process(data, target_class=[0])
+            # 设定接收人类的数据
+            data = process(data, target_class=[class_names.index('person')])
             result = custom_show(_frame, data['masks'])
             return result
 
@@ -179,7 +184,7 @@ class CompositeObject(QObject):
             duration = min(target.duration, background.duration, audio.duration)
 
         # 把目标的识别结果——size为(n,w,h)的ndarray转换为mask，该mask表明它所属的片段哪些部分在背景上可见
-        mask_clip = target.fl_image(custom_frame).to_mask().without_audio()
+        mask_clip = target.fl_image(custom_frame).to_mask()
 
         # 在目标或背景上进行高斯模糊
         if self.gauss_target:
@@ -216,6 +221,27 @@ class CompositeObject(QObject):
         self.finish_process.emit()
 
 
+# 保存临时片段
+class SaveTemp(QObject):
+    finish_process = pyqtSignal()
+    progress = pyqtSignal(int)
+    message = pyqtSignal(str)
+
+    def __init__(self, clip, parent=None):
+        super(SaveTemp, self).__init__(parent)
+        self.clip = clip
+
+    @check_outpath
+    def process(self):
+        myLogger = MyBarLogger(self.message, self.progress)
+        if isinstance(self.clip, VideoClip):
+            self.clip.write_videofile(f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp4', codec='mpeg4',
+                audio_codec="libmp3lame",
+                bitrate="8000k",
+                threads=4, logger=myLogger)
+        elif isinstance(self.clip, AudioClip):
+            self.clip.write_audiofile(f'./output/{time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())}.mp3',logger=myLogger)
+        self.finish_process.emit()
 
 
 
